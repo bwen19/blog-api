@@ -7,23 +7,62 @@ package db
 import (
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Article struct {
-	ID            int32         `json:"id"`
-	Author        sql.NullInt32 `json:"author"`
-	Title         string        `json:"title"`
-	Summary       string        `json:"summary"`
-	Content       string        `json:"content"`
-	ArticleStatus string        `json:"article_status"`
-	PublishAt     time.Time     `json:"publish_at"`
+	ID        int64     `json:"id"`
+	Author    string    `json:"author"`
+	Category  string    `json:"category"`
+	Title     string    `json:"title"`
+	Summary   string    `json:"summary"`
+	Content   string    `json:"content"`
+	Status    string    `json:"status"`
+	ViewCount int64     `json:"view_count"`
+	UpdateAt  time.Time `json:"update_at"`
+	CreateAt  time.Time `json:"create_at"`
+}
+
+type ArticleTag struct {
+	ArticleID int64  `json:"article_id"`
+	Tag       string `json:"tag"`
+}
+
+type Category struct {
+	Name string `json:"name"`
+}
+
+type Comment struct {
+	ID        int64         `json:"id"`
+	ParentID  sql.NullInt64 `json:"parent_id"`
+	ArticleID int64         `json:"article_id"`
+	Commenter string        `json:"commenter"`
+	Content   string        `json:"content"`
+	CommentAt time.Time     `json:"comment_at"`
+}
+
+type Session struct {
+	ID           uuid.UUID `json:"id"`
+	Username     string    `json:"username"`
+	RefreshToken string    `json:"refresh_token"`
+	UserAgent    string    `json:"user_agent"`
+	ClientIp     string    `json:"client_ip"`
+	IsBlocked    bool      `json:"is_blocked"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreateAt     time.Time `json:"create_at"`
+}
+
+type Tag struct {
+	Name  string `json:"name"`
+	Count int64  `json:"count"`
 }
 
 type User struct {
-	ID        int32     `json:"id"`
-	Username  string    `json:"username"`
-	Password  string    `json:"password"`
-	Nickname  string    `json:"nickname"`
-	AvatarSrc string    `json:"avatar_src"`
-	CreateAt  time.Time `json:"create_at"`
+	Username       string    `json:"username"`
+	HashedPassword string    `json:"hashed_password"`
+	Email          string    `json:"email"`
+	AvatarSrc      string    `json:"avatar_src"`
+	Role           string    `json:"role"`
+	CreateAt       time.Time `json:"create_at"`
 }
