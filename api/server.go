@@ -1,9 +1,9 @@
 package api
 
 import (
-	db "blog/db/sqlc"
-	"blog/token"
-	"blog/util"
+	db "blog/server/db/sqlc"
+	"blog/server/token"
+	"blog/server/util"
 	"fmt"
 
 	"github.com/gin-gonic/gin"

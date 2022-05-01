@@ -1,4 +1,4 @@
-module blog
+module blog/server
 
 go 1.18
 

@@ -1,7 +1,7 @@
 package db
 
 import (
-	"blog/util"
+	"blog/server/util"
 	"context"
 	"database/sql"
 	"testing"

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"blog/api"
-	db "blog/db/sqlc"
-	"blog/util"
+	"blog/server/api"
+	db "blog/server/db/sqlc"
+	"blog/server/util"
 	"database/sql"
 	"log"
 

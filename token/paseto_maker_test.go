@@ -1,7 +1,7 @@
 package token
 
 import (
-	"blog/util"
+	"blog/server/util"
 	"testing"
 	"time"
 

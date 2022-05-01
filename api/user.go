@@ -1,8 +1,8 @@
 package api
 
 import (
-	db "blog/db/sqlc"
-	"blog/util"
+	db "blog/server/db/sqlc"
+	"blog/server/util"
 	"database/sql"
 	"fmt"
 	"net/http"

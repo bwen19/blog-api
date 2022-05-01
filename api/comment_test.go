@@ -1,10 +1,10 @@
 package api
 
 import (
-	mockdb "blog/db/mock"
-	db "blog/db/sqlc"
-	"blog/token"
-	"blog/util"
+	mockdb "blog/server/db/mock"
+	db "blog/server/db/sqlc"
+	"blog/server/token"
+	"blog/server/util"
 	"bytes"
 	"database/sql"
 	"encoding/json"

@@ -1,9 +1,9 @@
 package api
 
 import (
-	mockdb "blog/db/mock"
-	db "blog/db/sqlc"
-	"blog/token"
+	mockdb "blog/server/db/mock"
+	db "blog/server/db/sqlc"
+	"blog/server/token"
 	"database/sql"
 	"fmt"
 	"net/http"
