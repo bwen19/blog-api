@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
+import "common_message.proto";
+
+option go_package = "blog/server/pb";
+
+message CreateUserRequest {
+    string username = 1;
+    string email = 2;
+    string password = 3;
+    string role = 4;
+}
+
+message DeleteUsersRequest {
+    repeated int64 user_ids = 1;
+}
+
+message UpdateUserRequest {
+    message User {
+        int64 id = 1;
+        string username = 2;
+        string email = 3;
+        string password = 4;
+        string role = 5;
+        bool is_deleted = 6;
+    }
+    User user = 1;
+    google.protobuf.FieldMask update_mask = 2;
+}
+
+message ListUsersRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string order_by = 4;
+    string keyword = 5;
+}
+message ListUsersResponse {
+    message UserItem {
+        int64 id = 1;
+        string username = 2;
+        string email = 3;
+        string avatar = 4;
+        int64 post_count = 5;
+        string role = 6;
+        bool is_deleted = 7;
+        google.protobuf.Timestamp create_at = 8;
+    }
+    int64 total = 1;
+    repeated UserItem users = 2;
+}
+
+message ChangeProfileRequest {
+    message User {
+        int64 id = 1;
+        string username = 2;
+        string email = 3;
+        string info = 4;
+    }
+    User user = 1;
+    google.protobuf.FieldMask update_mask = 2;
+}
+message ChangeProfileResponse {
+    User user = 1;
+}
+
+message ChangePasswordRequest {
+    int64 user_id = 1;
+    string old_password = 2;
+    string new_password = 3;
+}
+
+message GetUserProfileRequest {
+    int64 user_id = 1;
+    int64 self_id = 2;
+}
+message GetUserProfileResponse {
+    message User {
+        int64 id = 1;
+        string username = 2;
+        string avatar = 3;
+        string info = 4;
+        int64 star_count = 5;
+        int64 view_count = 6;
+        int64 follower_count = 7;
+        int64 following_count = 8;
+        bool is_followed = 9;
+    }
+    User user = 1;
+}
+

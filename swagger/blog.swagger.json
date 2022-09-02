@@ -1,0 +1,3159 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Blog API",
+    "version": "1.0",
+    "contact": {
+      "name": "Eruhini",
+      "email": "none@example.com"
+    }
+  },
+  "tags": [
+    {
+      "name": "Blog"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/auth/autologin": {
+      "post": {
+        "summary": "AutoLogin",
+        "operationId": "Blog_AutoLogin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbAutoLoginResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbAutoLoginRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Login",
+        "operationId": "Blog_Login",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbLoginResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbLoginRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Logout",
+        "operationId": "Blog_Logout",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbLogoutRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Refresh token",
+        "operationId": "Blog_Refresh",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbRefreshTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbRefreshTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register",
+        "operationId": "Blog_Register",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbRegisterResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbRegisterRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/category": {
+      "get": {
+        "summary": "ListCategories",
+        "operationId": "Blog_ListCategories",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListCategoriesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeleteCategories",
+        "operationId": "Blog_DeleteCategories",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteCategoriesRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "CreateCategory",
+        "operationId": "Blog_CreateCategory",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbCreateCategoryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCreateCategoryRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/category/all": {
+      "get": {
+        "summary": "GetCategories",
+        "operationId": "Blog_GetCategories",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetCategoriesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/category/{categoryId}": {
+      "put": {
+        "summary": "UpdateCategory",
+        "operationId": "Blog_UpdateCategory",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbUpdateCategoryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/comment": {
+      "get": {
+        "summary": "ListComments",
+        "operationId": "Blog_ListComments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListCommentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "postId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "selfId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "CreateComment",
+        "operationId": "Blog_CreateComment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbCreateCommentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCreateCommentRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/comment/reply": {
+      "get": {
+        "summary": "ListReplies",
+        "operationId": "Blog_ListReplies",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListRepliesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "commentId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "selfId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/comment/star": {
+      "put": {
+        "summary": "StarComment",
+        "operationId": "Blog_StarComment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbStarCommentRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/comment/{commentId}": {
+      "delete": {
+        "summary": "DeleteComment",
+        "operationId": "Blog_DeleteComment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/follow": {
+      "get": {
+        "summary": "ListFollows",
+        "operationId": "Blog_ListFollows",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListFollowsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "isFollower",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "FollowUser",
+        "operationId": "Blog_FollowUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbFollowUserRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/notification": {
+      "get": {
+        "summary": "ListNotifs",
+        "operationId": "Blog_ListNotifs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListNotifsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeleteNotifs",
+        "operationId": "Blog_DeleteNotifs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteNotifsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/notification/read": {
+      "put": {
+        "summary": "MarkAllRead",
+        "operationId": "Blog_MarkAllRead",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post": {
+      "get": {
+        "summary": "FetchPosts",
+        "operationId": "Blog_FetchPosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbFetchPostsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "isFeatured",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "authorId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "selfId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "tagId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeletePosts",
+        "operationId": "Blog_DeletePosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeletePostsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "CreatePost",
+        "operationId": "Blog_CreatePost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbCreatePostResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCreatePostRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/admin": {
+      "get": {
+        "summary": "GetPosts",
+        "operationId": "Blog_GetPosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetPostsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/admin/{post.id}": {
+      "patch": {
+        "summary": "ChangePost",
+        "operationId": "Blog_ChangePost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "post.id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "post",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "categoryIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "int64"
+                  }
+                },
+                "isFeatured": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "name": "updateMask",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/author": {
+      "get": {
+        "summary": "ListPosts",
+        "operationId": "Blog_ListPosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListPostsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/publish": {
+      "post": {
+        "summary": "PublishPost",
+        "operationId": "Blog_PublishPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postIds",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "int64"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/read/{postId}": {
+      "get": {
+        "summary": "ReadPost",
+        "operationId": "Blog_ReadPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbReadPostResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "selfId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/review/{postId}": {
+      "get": {
+        "summary": "ReviewPost",
+        "operationId": "Blog_ReviewPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbReviewPostResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/star": {
+      "post": {
+        "summary": "StarPost",
+        "operationId": "Blog_StarPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbStarPostRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/submit": {
+      "post": {
+        "summary": "SubmitPost",
+        "operationId": "Blog_SubmitPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postIds",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "int64"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/withdraw": {
+      "post": {
+        "summary": "WithdrawPost",
+        "operationId": "Blog_WithdrawPost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postIds",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "int64"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/post/{post.id}": {
+      "patch": {
+        "summary": "UpdatePost",
+        "operationId": "Blog_UpdatePost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbUpdatePostResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "post.id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "post",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "abstract": {
+                  "type": "string"
+                },
+                "coverImage": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "categoryIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "int64"
+                  }
+                },
+                "tagNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "updateMask",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/session": {
+      "get": {
+        "summary": "ListSessions",
+        "operationId": "Blog_ListSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListSessionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeleteSessions",
+        "operationId": "Blog_DeleteSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteSessionsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/session/expired": {
+      "delete": {
+        "summary": "DeleteExpiredSessions",
+        "operationId": "Blog_DeleteExpiredSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/tag": {
+      "get": {
+        "summary": "ListTags",
+        "operationId": "Blog_ListTags",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListTagsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeleteTags",
+        "operationId": "Blog_DeleteTags",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteTagsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "CreateTag",
+        "operationId": "Blog_CreateTag",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbCreateTagResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCreateTagRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/tag/{tagId}": {
+      "put": {
+        "summary": "UpdateTag",
+        "operationId": "Blog_UpdateTag",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbUpdateTagResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tagId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/user": {
+      "get": {
+        "summary": "ListUsers",
+        "operationId": "Blog_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeleteUsers",
+        "operationId": "Blog_DeleteUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteUsersRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "post": {
+        "summary": "CreateUser",
+        "operationId": "Blog_CreateUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCreateUserRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/user/profile": {
+      "get": {
+        "summary": "GetUserProfile",
+        "operationId": "Blog_GetUserProfile",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetUserProfileResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "selfId",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/user/{user.id}": {
+      "patch": {
+        "summary": "UpdateUser",
+        "operationId": "Blog_UpdateUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user.id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "user",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "isDeleted": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "name": "updateMask",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/user/{user.id}/profile": {
+      "patch": {
+        "summary": "ChangeProfile",
+        "operationId": "Blog_ChangeProfile",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbChangeProfileResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user.id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "user",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "info": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "updateMask",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/user/{userId}/password": {
+      "put": {
+        "summary": "ChangePassword",
+        "operationId": "Blog_ChangePassword",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "oldPassword": {
+                  "type": "string"
+                },
+                "newPassword": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "ListCategoriesResponseCategoryItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postCount": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "ListSessionsResponseSessionItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "userAgent": {
+          "type": "string"
+        },
+        "clientIp": {
+          "type": "string"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ListTagsResponseTagItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postCount": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "ListUsersResponseUserItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "postCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "role": {
+          "type": "string"
+        },
+        "isDeleted": {
+          "type": "boolean"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbAutoLoginRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string"
+        }
+      }
+    },
+    "pbAutoLoginResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/pbUser"
+        },
+        "accessToken": {
+          "type": "string"
+        },
+        "unreadCount": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "pbCategory": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "pbChangePostRequestPost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "isFeatured": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbChangeProfileRequestUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "info": {
+          "type": "string"
+        }
+      }
+    },
+    "pbChangeProfileResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/pbUser"
+        }
+      }
+    },
+    "pbComment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "user": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "content": {
+          "type": "string"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replyCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCommentReply"
+          }
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbCommentReply": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replyUser": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "user": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "content": {
+          "type": "string"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbCreateCategoryRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "pbCreateCategoryResponse": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "$ref": "#/definitions/pbCategory"
+        }
+      }
+    },
+    "pbCreateCommentRequest": {
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "parentId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replyUserId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "pbCreateCommentResponse": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "parentId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replyUser": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "user": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "content": {
+          "type": "string"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbCreatePostRequest": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "abstract": {
+          "type": "string"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "tagNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pbCreatePostResponse": {
+      "type": "object",
+      "properties": {
+        "post": {
+          "$ref": "#/definitions/pbPost"
+        }
+      }
+    },
+    "pbCreateTagRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "pbCreateTagResponse": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "$ref": "#/definitions/pbTag"
+        }
+      }
+    },
+    "pbCreateUserRequest": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "pbDeleteCategoriesRequest": {
+      "type": "object",
+      "properties": {
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbDeleteNotifsRequest": {
+      "type": "object",
+      "properties": {
+        "notificationIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbDeletePostsRequest": {
+      "type": "object",
+      "properties": {
+        "postIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbDeleteSessionsRequest": {
+      "type": "object",
+      "properties": {
+        "sessionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pbDeleteTagsRequest": {
+      "type": "object",
+      "properties": {
+        "tagIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbDeleteUsersRequest": {
+      "type": "object",
+      "properties": {
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbFetchPostsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbFetchPostsResponsePostItem"
+          }
+        }
+      }
+    },
+    "pbFetchPostsResponsePostItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "abstract": {
+          "type": "string"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbTag"
+          }
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "commentCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbFollowUserRequest": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "isLike": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbGetCategoriesResponse": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCategory"
+          }
+        }
+      }
+    },
+    "pbGetPostsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbGetPostsResponsePostItem"
+          }
+        }
+      }
+    },
+    "pbGetPostsResponsePostItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/definitions/pbUser"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCategory"
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "updateAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbGetUserProfileResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/pbGetUserProfileResponseUser"
+        }
+      }
+    },
+    "pbGetUserProfileResponseUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "info": {
+          "type": "string"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "followerCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "followingCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "isFollowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbListCategoriesResponse": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListCategoriesResponseCategoryItem"
+          }
+        }
+      }
+    },
+    "pbListCommentsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "commentCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbComment"
+          }
+        }
+      }
+    },
+    "pbListFollowsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbUserInfo"
+          }
+        }
+      }
+    },
+    "pbListNotifsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "unreadCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "notifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbNotification"
+          }
+        }
+      }
+    },
+    "pbListPostsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbListPostsResponsePostItem"
+          }
+        }
+      }
+    },
+    "pbListPostsResponsePostItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "updateAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbListRepliesResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "commentReplies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCommentReply"
+          }
+        }
+      }
+    },
+    "pbListSessionsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListSessionsResponseSessionItem"
+          }
+        }
+      }
+    },
+    "pbListTagsResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListTagsResponseTagItem"
+          }
+        }
+      }
+    },
+    "pbListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListUsersResponseUserItem"
+          }
+        }
+      }
+    },
+    "pbLoginRequest": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "pbLoginResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/pbUser"
+        },
+        "accessToken": {
+          "type": "string"
+        },
+        "refreshToken": {
+          "type": "string"
+        },
+        "unreadCount": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "pbLogoutRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string"
+        }
+      }
+    },
+    "pbNotification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbPost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "abstract": {
+          "type": "string"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCategory"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbTag"
+          }
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pbReadPostResponse": {
+      "type": "object",
+      "properties": {
+        "post": {
+          "$ref": "#/definitions/pbReadPostResponsePost"
+        }
+      }
+    },
+    "pbReadPostResponsePost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/definitions/pbUserInfo"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCategory"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbTag"
+          }
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "pbRefreshTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string"
+        }
+      }
+    },
+    "pbRefreshTokenResponse": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string"
+        }
+      }
+    },
+    "pbRegisterRequest": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "pbRegisterResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/pbUser"
+        }
+      }
+    },
+    "pbReviewPostResponse": {
+      "type": "object",
+      "properties": {
+        "post": {
+          "$ref": "#/definitions/pbPost"
+        }
+      }
+    },
+    "pbStarCommentRequest": {
+      "type": "object",
+      "properties": {
+        "commentId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "isLike": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbStarPostRequest": {
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "isLike": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbTag": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "pbUpdateCategoryResponse": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "$ref": "#/definitions/pbCategory"
+        }
+      }
+    },
+    "pbUpdatePostRequestPost": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "abstract": {
+          "type": "string"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "tagNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pbUpdatePostResponse": {
+      "type": "object",
+      "properties": {
+        "post": {
+          "$ref": "#/definitions/pbPost"
+        }
+      }
+    },
+    "pbUpdateTagResponse": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "$ref": "#/definitions/pbTag"
+        }
+      }
+    },
+    "pbUpdateUserRequestUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "isDeleted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pbUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "info": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "pbUserInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "info": {
+          "type": "string"
+        },
+        "followerCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "followingCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "isFollowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

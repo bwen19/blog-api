@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.13.0
 
-package db
+package sqlc
 
 import (
 	"database/sql"
@@ -11,58 +11,95 @@ import (
 	"github.com/google/uuid"
 )
 
-type Article struct {
-	ID        int64     `json:"id"`
-	Author    string    `json:"author"`
-	Category  string    `json:"category"`
-	Title     string    `json:"title"`
-	Summary   string    `json:"summary"`
-	Content   string    `json:"content"`
-	Status    string    `json:"status"`
-	ViewCount int64     `json:"view_count"`
-	UpdateAt  time.Time `json:"update_at"`
-	CreateAt  time.Time `json:"create_at"`
-}
-
-type ArticleTag struct {
-	ArticleID int64  `json:"article_id"`
-	Tag       string `json:"tag"`
-}
-
 type Category struct {
+	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 
 type Comment struct {
-	ID        int64         `json:"id"`
-	ParentID  sql.NullInt64 `json:"parent_id"`
-	ArticleID int64         `json:"article_id"`
-	Commenter string        `json:"commenter"`
-	Content   string        `json:"content"`
-	CommentAt time.Time     `json:"comment_at"`
+	ID          int64         `json:"id"`
+	PostID      int64         `json:"post_id"`
+	UserID      int64         `json:"user_id"`
+	ParentID    sql.NullInt64 `json:"parent_id"`
+	ReplyUserID sql.NullInt64 `json:"reply_user_id"`
+	Content     string        `json:"content"`
+	CreateAt    time.Time     `json:"create_at"`
+}
+
+type CommentStar struct {
+	CommentID int64 `json:"comment_id"`
+	UserID    int64 `json:"user_id"`
+}
+
+type Follow struct {
+	UserID     int64     `json:"user_id"`
+	FollowerID int64     `json:"follower_id"`
+	CreateAt   time.Time `json:"create_at"`
+}
+
+type Notification struct {
+	ID       int64     `json:"id"`
+	UserID   int64     `json:"user_id"`
+	Kind     string    `json:"kind"`
+	Title    string    `json:"title"`
+	Content  string    `json:"content"`
+	Unread   bool      `json:"unread"`
+	CreateAt time.Time `json:"create_at"`
+}
+
+type Post struct {
+	ID         int64     `json:"id"`
+	AuthorID   int64     `json:"author_id"`
+	Title      string    `json:"title"`
+	Abstract   string    `json:"abstract"`
+	CoverImage string    `json:"cover_image"`
+	Content    string    `json:"content"`
+	Status     string    `json:"status"`
+	IsFeatured bool      `json:"is_featured"`
+	ViewCount  int64     `json:"view_count"`
+	UpdateAt   time.Time `json:"update_at"`
+	PublishAt  time.Time `json:"publish_at"`
+}
+
+type PostCategory struct {
+	PostID     int64 `json:"post_id"`
+	CategoryID int64 `json:"category_id"`
+}
+
+type PostStar struct {
+	PostID   int64     `json:"post_id"`
+	UserID   int64     `json:"user_id"`
+	CreateAt time.Time `json:"create_at"`
+}
+
+type PostTag struct {
+	PostID int64 `json:"post_id"`
+	TagID  int64 `json:"tag_id"`
 }
 
 type Session struct {
 	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
+	UserID       int64     `json:"user_id"`
 	RefreshToken string    `json:"refresh_token"`
 	UserAgent    string    `json:"user_agent"`
 	ClientIp     string    `json:"client_ip"`
-	IsBlocked    bool      `json:"is_blocked"`
 	ExpiresAt    time.Time `json:"expires_at"`
 	CreateAt     time.Time `json:"create_at"`
 }
 
 type Tag struct {
-	Name  string `json:"name"`
-	Count int64  `json:"count"`
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 type User struct {
+	ID             int64     `json:"id"`
 	Username       string    `json:"username"`
-	HashedPassword string    `json:"hashed_password"`
 	Email          string    `json:"email"`
-	AvatarSrc      string    `json:"avatar_src"`
+	HashedPassword string    `json:"hashed_password"`
+	Avatar         string    `json:"avatar"`
+	Info           string    `json:"info"`
 	Role           string    `json:"role"`
+	IsDeleted      bool      `json:"is_deleted"`
 	CreateAt       time.Time `json:"create_at"`
 }

@@ -3,65 +3,173 @@
 //   sqlc v1.13.0
 // source: category.sql
 
-package db
+package sqlc
 
 import (
 	"context"
 )
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories ( name ) VALUES ( $1 )
-RETURNING name
+INSERT INTO categories (name) VALUES ($1) RETURNING id, name
 `
 
-func (q *Queries) CreateCategory(ctx context.Context, name string) (string, error) {
-	row := q.db.QueryRowContext(ctx, createCategory, name)
-	err := row.Scan(&name)
-	return name, err
+func (q *Queries) CreateCategory(ctx context.Context, name string) (Category, error) {
+	row := q.db.QueryRow(ctx, createCategory, name)
+	var i Category
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
-const deleteCategory = `-- name: DeleteCategory :exec
-DELETE FROM categories WHERE name = $1
+const deleteCategories = `-- name: DeleteCategories :execrows
+DELETE FROM categories WHERE id = ANY($1::bigint[])
 `
 
-func (q *Queries) DeleteCategory(ctx context.Context, name string) error {
-	_, err := q.db.ExecContext(ctx, deleteCategory, name)
-	return err
+func (q *Queries) DeleteCategories(ctx context.Context, ids []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCategories, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const getCategory = `-- name: GetCategory :one
-SELECT name FROM categories
-WHERE name = $1
-LIMIT 1
+const getCategories = `-- name: GetCategories :many
+SELECT id, name FROM categories
+ORDER BY id ASC
 `
 
-func (q *Queries) GetCategory(ctx context.Context, name string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getCategory, name)
-	err := row.Scan(&name)
-	return name, err
-}
-
-const listCategories = `-- name: ListCategories :many
-SELECT name FROM categories
-ORDER BY name
-`
-
-func (q *Queries) ListCategories(ctx context.Context) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listCategories)
+func (q *Queries) GetCategories(ctx context.Context) ([]Category, error) {
+	rows, err := q.db.Query(ctx, getCategories)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []Category{}
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var i Category
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
-		items = append(items, name)
+		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	return items, nil
+}
+
+const getPostCategories = `-- name: GetPostCategories :many
+SELECT id, name FROM categories
+WHERE id = ANY(
+  SELECT category_id FROM post_categories
+  WHERE post_id = $1
+)
+`
+
+func (q *Queries) GetPostCategories(ctx context.Context, postID int64) ([]Category, error) {
+	rows, err := q.db.Query(ctx, getPostCategories, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Category{}
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCategories = `-- name: ListCategories :many
+SELECT c.id, c.name,
+  (SELECT count(*) FROM post_categories WHERE category_id = c.id) post_count
+FROM categories c
+ORDER BY
+  CASE WHEN $1::bool THEN name END ASC,
+  CASE WHEN $2::bool THEN name END DESC,
+  id ASC
+`
+
+type ListCategoriesParams struct {
+	NameAsc  bool `json:"name_asc"`
+	NameDesc bool `json:"name_desc"`
+}
+
+type ListCategoriesRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	PostCount int64  `json:"post_count"`
+}
+
+func (q *Queries) ListCategories(ctx context.Context, arg ListCategoriesParams) ([]ListCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listCategories, arg.NameAsc, arg.NameDesc)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCategoriesRow{}
+	for rows.Next() {
+		var i ListCategoriesRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.PostCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setPostCategories = `-- name: SetPostCategories :many
+WITH Category_CTE AS (
+  SELECT DISTINCT id, name FROM categories
+  WHERE id = ANY($1::bigint[])
+), Values_CTE AS (
+  SELECT p.post_id, cc.id category_id FROM (
+    SELECT id post_id FROM posts WHERE id = $2::bigint
+  ) p
+  CROSS JOIN Category_CTE cc
+), Del_CTE AS (
+  DELETE FROM post_categories
+  WHERE post_id = $2::bigint
+    AND category_id NOT IN (SELECT id FROM Category_CTE)
+), Ins_CTE AS (
+  INSERT INTO post_categories (post_id, category_id)
+  SELECT post_id, category_id FROM Values_CTE
+  ON CONFLICT (post_id, category_id) DO NOTHING
+)
+SELECT id, name FROM Category_CTE
+`
+
+type SetPostCategoriesParams struct {
+	CategoryIds []int64 `json:"category_ids"`
+	PostID      int64   `json:"post_id"`
+}
+
+type SetPostCategoriesRow struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) SetPostCategories(ctx context.Context, arg SetPostCategoriesParams) ([]SetPostCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, setPostCategories, arg.CategoryIds, arg.PostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SetPostCategoriesRow{}
+	for rows.Next() {
+		var i SetPostCategoriesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -71,19 +179,18 @@ func (q *Queries) ListCategories(ctx context.Context) ([]string, error) {
 
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE categories
-SET name = $1::varchar
-WHERE name = $2::varchar
-RETURNING name
+SET name = $2::varchar
+WHERE id = $1 RETURNING id, name
 `
 
 type UpdateCategoryParams struct {
-	NewName string `json:"new_name"`
-	Name    string `json:"name"`
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
-func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateCategory, arg.NewName, arg.Name)
-	var name string
-	err := row.Scan(&name)
-	return name, err
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.Name)
+	var i Category
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }

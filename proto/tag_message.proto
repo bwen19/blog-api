@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package pb;
+
+import "common_message.proto";
+
+option go_package = "blog/server/pb";
+
+message CreateTagRequest {
+    string name = 1;
+}
+message CreateTagResponse {
+    Tag tag = 1;
+}
+
+message DeleteTagsRequest {
+    repeated int64 tag_ids = 1;
+}
+
+message UpdateTagRequest {
+    int64 tag_id = 1;
+    string name = 2;
+}
+message UpdateTagResponse {
+    Tag tag = 1;
+}
+
+message ListTagsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string order_by = 4;
+    string keyword = 5;
+}
+message ListTagsResponse {
+    message TagItem {
+        int64 id = 1;
+        string name = 2;
+        int64 post_count = 3;
+    }
+    int64 total = 1;
+    repeated TagItem tags = 2;
+}

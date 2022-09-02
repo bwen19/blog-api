@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "blog/server/pb";
+
+message Notification {
+    int64 id = 1;
+    string kind = 2;
+    string title = 3;
+    string content = 4;
+    bool unread = 5;
+    google.protobuf.Timestamp create_at = 6;
+}
+
+message DeleteNotifsRequest {
+    repeated int64 notification_ids = 1;
+}
+
+message ListNotifsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string kind = 3;
+}
+message ListNotifsResponse {
+    int64 total = 1;
+    int64 unread_count = 2;
+    repeated Notification notifications = 3;
+}

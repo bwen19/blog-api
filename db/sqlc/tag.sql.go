@@ -3,104 +3,80 @@
 //   sqlc v1.13.0
 // source: tag.sql
 
-package db
+package sqlc
 
 import (
 	"context"
 )
 
-const createArticleTag = `-- name: CreateArticleTag :one
-INSERT INTO article_tags (
-    article_id,
-    tag
-) VALUES (
-    $1, $2
-) RETURNING article_id, tag
-`
-
-type CreateArticleTagParams struct {
-	ArticleID int64  `json:"article_id"`
-	Tag       string `json:"tag"`
-}
-
-func (q *Queries) CreateArticleTag(ctx context.Context, arg CreateArticleTagParams) (ArticleTag, error) {
-	row := q.db.QueryRowContext(ctx, createArticleTag, arg.ArticleID, arg.Tag)
-	var i ArticleTag
-	err := row.Scan(&i.ArticleID, &i.Tag)
-	return i, err
-}
-
 const createTag = `-- name: CreateTag :one
-INSERT INTO tags ( name ) VALUES ( $1 )
-RETURNING name, count
+INSERT INTO tags (name) VALUES ($1) RETURNING id, name
 `
 
 func (q *Queries) CreateTag(ctx context.Context, name string) (Tag, error) {
-	row := q.db.QueryRowContext(ctx, createTag, name)
+	row := q.db.QueryRow(ctx, createTag, name)
 	var i Tag
-	err := row.Scan(&i.Name, &i.Count)
+	err := row.Scan(&i.ID, &i.Name)
 	return i, err
 }
 
-const deleteArticleTag = `-- name: DeleteArticleTag :exec
-DELETE FROM article_tags
-WHERE article_id = $1
-    AND tag = $2
+const deleteTags = `-- name: DeleteTags :execrows
+DELETE FROM tags WHERE id = ANY($1::bigint[])
 `
 
-type DeleteArticleTagParams struct {
-	ArticleID int64  `json:"article_id"`
-	Tag       string `json:"tag"`
+func (q *Queries) DeleteTags(ctx context.Context, ids []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTags, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-func (q *Queries) DeleteArticleTag(ctx context.Context, arg DeleteArticleTagParams) error {
-	_, err := q.db.ExecContext(ctx, deleteArticleTag, arg.ArticleID, arg.Tag)
-	return err
-}
-
-const deleteTag = `-- name: DeleteTag :exec
-DELETE FROM tags WHERE name = $1
+const getPostTags = `-- name: GetPostTags :many
+SELECT id, name FROM tags
+WHERE id = ANY(
+  SELECT tag_id FROM post_tags
+  WHERE post_id = $1
+)
 `
 
-func (q *Queries) DeleteTag(ctx context.Context, name string) error {
-	_, err := q.db.ExecContext(ctx, deleteTag, name)
-	return err
-}
-
-const getTag = `-- name: GetTag :one
-SELECT name, count FROM tags
-WHERE name = $1
-LIMIT 1
-`
-
-func (q *Queries) GetTag(ctx context.Context, name string) (Tag, error) {
-	row := q.db.QueryRowContext(ctx, getTag, name)
-	var i Tag
-	err := row.Scan(&i.Name, &i.Count)
-	return i, err
-}
-
-const listArticleTags = `-- name: ListArticleTags :many
-SELECT tag FROM article_tags
-WHERE article_id = $1
-`
-
-func (q *Queries) ListArticleTags(ctx context.Context, articleID int64) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listArticleTags, articleID)
+func (q *Queries) GetPostTags(ctx context.Context, postID int64) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, getPostTags, postID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []Tag{}
 	for rows.Next() {
-		var tag string
-		if err := rows.Scan(&tag); err != nil {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
-		items = append(items, tag)
+		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	return items, nil
+}
+
+const getTagsByNames = `-- name: GetTagsByNames :many
+SELECT id, name FROM tags WHERE name = ANY($1::varchar[])
+`
+
+func (q *Queries) GetTagsByNames(ctx context.Context, name []string) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, getTagsByNames, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Tag{}
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -109,33 +85,120 @@ func (q *Queries) ListArticleTags(ctx context.Context, articleID int64) ([]strin
 }
 
 const listTags = `-- name: ListTags :many
-SELECT name, count FROM tags
-ORDER BY count DESC
+WITH Data_CTE AS (
+  SELECT t.id, t.name, count(pt.post_id) post_count
+  FROM tags t
+  LEFT JOIN post_tags pt ON pt.tag_id = t.id
+  GROUP BY t.id, t.name
+),
+Count_CTE AS (
+  SELECT count(*) AS total FROM Data_CTE
+)
+SELECT id, name, post_count, total
+FROM Data_CTE
+CROSS JOIN Count_CTE
+ORDER BY
+  CASE WHEN $3::bool THEN name END ASC,
+  CASE WHEN $4::bool THEN name END DESC,
+  CASE WHEN $5::bool THEN post_count END ASC,
+  CASE WHEN $6::bool THEN post_count END DESC,
+  id ASC
 LIMIT $1
 OFFSET $2
 `
 
 type ListTagsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Limit         int32 `json:"limit"`
+	Offset        int32 `json:"offset"`
+	NameAsc       bool  `json:"name_asc"`
+	NameDesc      bool  `json:"name_desc"`
+	PostCountAsc  bool  `json:"post_count_asc"`
+	PostCountDesc bool  `json:"post_count_desc"`
 }
 
-func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error) {
-	rows, err := q.db.QueryContext(ctx, listTags, arg.Limit, arg.Offset)
+type ListTagsRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	PostCount int64  `json:"post_count"`
+	Total     int64  `json:"total"`
+}
+
+func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsRow, error) {
+	rows, err := q.db.Query(ctx, listTags,
+		arg.Limit,
+		arg.Offset,
+		arg.NameAsc,
+		arg.NameDesc,
+		arg.PostCountAsc,
+		arg.PostCountDesc,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Tag{}
+	items := []ListTagsRow{}
 	for rows.Next() {
-		var i Tag
-		if err := rows.Scan(&i.Name, &i.Count); err != nil {
+		var i ListTagsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.PostCount,
+			&i.Total,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	return items, nil
+}
+
+const setPostTags = `-- name: SetPostTags :many
+WITH Tag_CTE AS (
+  SELECT DISTINCT id, name FROM tags
+  WHERE name = ANY($1::varchar[])
+), Values_CTE AS (
+  SELECT p.post_id, tc.id tag_id FROM (
+    SELECT id post_id FROM posts WHERE id = $2::bigint
+  ) p
+  CROSS JOIN Tag_CTE tc
+), Del_CTE AS (
+  DELETE FROM post_tags
+  WHERE post_id = $2::bigint
+    AND tag_id NOT IN (SELECT id FROM Tag_CTE)
+), Ins_CTE AS (
+  INSERT INTO post_tags (post_id, tag_id)
+  SELECT post_id, tag_id FROM Values_CTE
+  ON CONFLICT (post_id, tag_id) DO NOTHING
+)
+SELECT id, name FROM Tag_CTE
+`
+
+type SetPostTagsParams struct {
+	TagNames []string `json:"tag_names"`
+	PostID   int64    `json:"post_id"`
+}
+
+type SetPostTagsRow struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) SetPostTags(ctx context.Context, arg SetPostTagsParams) ([]SetPostTagsRow, error) {
+	rows, err := q.db.Query(ctx, setPostTags, arg.TagNames, arg.PostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SetPostTagsRow{}
+	for rows.Next() {
+		var i SetPostTagsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -145,39 +208,18 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, erro
 
 const updateTag = `-- name: UpdateTag :one
 UPDATE tags
-SET
-    name = CASE WHEN $1::bool
-        THEN $2::varchar
-        ELSE name END,
-    count = CASE WHEN $3::bool THEN $4::bigint
-        WHEN $5::bool THEN count + 1
-        WHEN $6::bool THEN count - 1
-        ELSE count END
-WHERE name = $7::varchar
-RETURNING name, count
+SET name = $2::varchar
+WHERE id = $1 RETURNING id, name
 `
 
 type UpdateTagParams struct {
-	SetNewName bool   `json:"set_new_name"`
-	NewName    string `json:"new_name"`
-	SetCount   bool   `json:"set_count"`
-	Count      int64  `json:"count"`
-	AddCount   bool   `json:"add_count"`
-	MinusCount bool   `json:"minus_count"`
-	Name       string `json:"name"`
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 func (q *Queries) UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error) {
-	row := q.db.QueryRowContext(ctx, updateTag,
-		arg.SetNewName,
-		arg.NewName,
-		arg.SetCount,
-		arg.Count,
-		arg.AddCount,
-		arg.MinusCount,
-		arg.Name,
-	)
+	row := q.db.QueryRow(ctx, updateTag, arg.ID, arg.Name)
 	var i Tag
-	err := row.Scan(&i.Name, &i.Count)
+	err := row.Scan(&i.ID, &i.Name)
 	return i, err
 }

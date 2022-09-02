@@ -12,6 +12,9 @@ createdb:
 dropdb:
 	docker exec -it postgres dropdb blog
 
+db_schema:
+	dbml2sql --postgres -o db/schema/schema.sql db/schema/blog.dbml
+
 migrateup:
 	migrate -path db/migration -database "$(DB_URL)" -verbose up
 
@@ -19,7 +22,8 @@ migratedown:
 	migrate -path db/migration -database "$(DB_URL)" -verbose down
 
 sqlc:
-	sqlc generate
+	cmd /C del db\sqlc\\*.sql.go
+	docker run --rm -v D:\project\webapp\blog\server:/src -w /src kjconroy/sqlc generate
 
 test:
 	go test -v -cover ./...
@@ -27,7 +31,19 @@ test:
 server:
 	go run main.go
 
-mock:
-	mockgen -package mockdb -destination db/mock/store.go blog/server/db/sqlc Store
+proto:
+	cmd /C del pb\\*.go
+	protoc --proto_path=proto --go_out=pb --go_opt=paths=source_relative \
+	--go-grpc_out=pb --go-grpc_opt=paths=source_relative \
+	--grpc-gateway_out=pb \
+	--grpc-gateway_opt=paths=source_relative,allow_delete_body=true  \
+	--openapiv2_out=swagger \
+	--openapiv2_opt=allow_merge=true,merge_file_name=blog,allow_delete_body=true \
+	proto/*.proto
+	cmd /C del statik\\*.go
+	statik -src=swagger
 
-.PHONY: postgres createdb dropdb migrateup migratedown sqlc test server mock
+evans:
+	evans --host localhost --port 9090 -r repl
+
+.PHONY: network postgres createdb dropdb db_schema migrateup migratedown sqlc test server proto evans

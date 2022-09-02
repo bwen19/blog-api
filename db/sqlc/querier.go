@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.13.0
 
-package db
+package sqlc
 
 import (
 	"context"
@@ -11,38 +11,66 @@ import (
 )
 
 type Querier interface {
-	CreateArticle(ctx context.Context, arg CreateArticleParams) (Article, error)
-	CreateArticleTag(ctx context.Context, arg CreateArticleTagParams) (ArticleTag, error)
-	CreateCategory(ctx context.Context, name string) (string, error)
-	CreateComment(ctx context.Context, arg CreateCommentParams) (Comment, error)
+	CreateCategory(ctx context.Context, name string) (Category, error)
+	CreateComment(ctx context.Context, arg CreateCommentParams) (CreateCommentRow, error)
+	CreateCommentStar(ctx context.Context, arg CreateCommentStarParams) error
+	CreateFollow(ctx context.Context, arg CreateFollowParams) error
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
+	CreatePost(ctx context.Context, arg CreatePostParams) (Post, error)
+	CreatePostStar(ctx context.Context, arg CreatePostStarParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateTag(ctx context.Context, name string) (Tag, error)
+	CreateTags(ctx context.Context, name []string) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	DeleteArticle(ctx context.Context, arg DeleteArticleParams) error
-	DeleteArticleTag(ctx context.Context, arg DeleteArticleTagParams) error
-	DeleteCategory(ctx context.Context, name string) error
+	DeleteCategories(ctx context.Context, ids []int64) (int64, error)
 	DeleteComment(ctx context.Context, arg DeleteCommentParams) error
-	DeleteSession(ctx context.Context, id uuid.UUID) error
-	DeleteTag(ctx context.Context, name string) error
-	DeleteUser(ctx context.Context, username string) error
-	GetArticle(ctx context.Context, arg GetArticleParams) (Article, error)
-	GetCategory(ctx context.Context, name string) (string, error)
-	GetComment(ctx context.Context, id int64) (Comment, error)
+	DeleteCommentStar(ctx context.Context, arg DeleteCommentStarParams) error
+	DeleteExpiredSessions(ctx context.Context) error
+	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
+	DeleteNotifications(ctx context.Context, arg DeleteNotificationsParams) (int64, error)
+	DeletePostStar(ctx context.Context, arg DeletePostStarParams) error
+	DeletePosts(ctx context.Context, arg DeletePostsParams) (int64, error)
+	DeleteSession(ctx context.Context, arg DeleteSessionParams) error
+	DeleteSessions(ctx context.Context, arg DeleteSessionsParams) (int64, error)
+	DeleteTags(ctx context.Context, ids []int64) (int64, error)
+	DeleteUsers(ctx context.Context, ids []int64) (int64, error)
+	FeaturePost(ctx context.Context, arg FeaturePostParams) (int64, error)
+	FetchPosts(ctx context.Context, arg FetchPostsParams) ([]FetchPostsRow, error)
+	GetCategories(ctx context.Context) ([]Category, error)
+	GetPostCategories(ctx context.Context, postID int64) ([]Category, error)
+	GetPostTags(ctx context.Context, postID int64) ([]Tag, error)
+	GetPosts(ctx context.Context, arg GetPostsParams) ([]GetPostsRow, error)
 	GetSession(ctx context.Context, id uuid.UUID) (Session, error)
-	GetTag(ctx context.Context, name string) (Tag, error)
-	GetUser(ctx context.Context, arg GetUserParams) (User, error)
-	ListArticleTags(ctx context.Context, articleID int64) ([]string, error)
-	ListArticles(ctx context.Context, arg ListArticlesParams) ([]ListArticlesRow, error)
-	ListCategories(ctx context.Context) ([]string, error)
-	ListChildComments(ctx context.Context, commentIds []int64) ([]ListChildCommentsRow, error)
-	ListCommentsByArticle(ctx context.Context, arg ListCommentsByArticleParams) ([]ListCommentsByArticleRow, error)
-	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
-	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
-	ReadArticle(ctx context.Context, id int64) (Article, error)
-	UpdateArticle(ctx context.Context, arg UpdateArticleParams) (Article, error)
-	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (string, error)
+	GetTagsByNames(ctx context.Context, name []string) ([]Tag, error)
+	GetUnreadCount(ctx context.Context, userID int64) (int64, error)
+	GetUser(ctx context.Context, id int64) (User, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserProfile(ctx context.Context, arg GetUserProfileParams) (GetUserProfileRow, error)
+	IncreaseViewCount(ctx context.Context, id int64) error
+	ListCategories(ctx context.Context, arg ListCategoriesParams) ([]ListCategoriesRow, error)
+	ListComments(ctx context.Context, arg ListCommentsParams) ([]ListCommentsRow, error)
+	ListFollowers(ctx context.Context, arg ListFollowersParams) ([]ListFollowersRow, error)
+	ListFollowings(ctx context.Context, arg ListFollowingsParams) ([]ListFollowingsRow, error)
+	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]ListNotificationsRow, error)
+	ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPostsRow, error)
+	ListReplies(ctx context.Context, arg ListRepliesParams) ([]ListRepliesRow, error)
+	ListSessions(ctx context.Context, arg ListSessionsParams) ([]ListSessionsRow, error)
+	ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsRow, error)
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error)
+	MarkAllRead(ctx context.Context, userID int64) error
+	MarkReadByIDs(ctx context.Context, arg MarkReadByIDsParams) (int64, error)
+	PublishPost(ctx context.Context, ids []int64) (int64, error)
+	ReadPost(ctx context.Context, arg ReadPostParams) (ReadPostRow, error)
+	ReviewPost(ctx context.Context, arg ReviewPostParams) (ReviewPostRow, error)
+	SetPostCategories(ctx context.Context, arg SetPostCategoriesParams) ([]SetPostCategoriesRow, error)
+	SetPostTags(ctx context.Context, arg SetPostTagsParams) ([]SetPostTagsRow, error)
+	SubmitPost(ctx context.Context, arg SubmitPostParams) (int64, error)
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
+	UpdatePost(ctx context.Context, arg UpdatePostParams) (Post, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	WithdrawPost(ctx context.Context, ids []int64) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

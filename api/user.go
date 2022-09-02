@@ -1,381 +1,357 @@
 package api
 
 import (
-	db "blog/server/db/sqlc"
+	"blog/server/db/sqlc"
+	"blog/server/pb"
 	"blog/server/util"
-	"database/sql"
-	"fmt"
-	"net/http"
-	"time"
+	"context"
 
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v4"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// Response types and utils
-type userResponse struct {
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	AvatarSrc string    `json:"avatar_src"`
-	CreateAt  time.Time `json:"create_at"`
-}
-
-func newUserResponse(user *db.User) userResponse {
-	return userResponse{
-		Username:  user.Username,
-		Email:     user.Email,
-		Role:      user.Role,
-		AvatarSrc: user.AvatarSrc,
-		CreateAt:  user.CreateAt,
-	}
-}
-
-// =============================================================
-// registerUser
-
-type registerUserRequest struct {
-	Username string `json:"username" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
-// @Router /api/register [post]
-func (server *Server) registerUser(ctx *gin.Context) {
-	var req registerUserRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	hashedPassword, err := util.HashPassword(req.Password)
+// -------------------------------------------------------------------
+// CreateUser
+func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*emptypb.Empty, error) {
+	arg, err := server.parseCreateUserRequest(req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, err
 	}
 
-	arg := db.CreateUserParams{
-		Username:       req.Username,
+	_, err = server.store.CreateUser(ctx, *arg)
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			switch pgErr.ConstraintName {
+			case "users_username_key":
+				return nil, status.Errorf(codes.AlreadyExists, "username already exists: %s", arg.Username)
+			case "users_email_key":
+				return nil, status.Errorf(codes.AlreadyExists, "email already exists: %s", arg.Email)
+			}
+		}
+		return nil, status.Error(codes.Internal, "failed to create user")
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+func (server *Server) parseCreateUserRequest(req *pb.CreateUserRequest) (*sqlc.CreateUserParams, error) {
+	username := req.GetUsername()
+	if err := util.ValidateString(username, 3, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
+	}
+
+	email := req.GetEmail()
+	if err := util.ValidateEmail(email); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
+	}
+
+	password := req.GetPassword()
+	if err := util.ValidateString(password, 6, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "password: %s", err.Error())
+	}
+	hashedPassword, err := util.HashPassword(password)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	role := req.GetRole()
+	if err := util.ValidateOneOf(role, []string{"admin", "author", "user"}); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "role: %s", err.Error())
+	}
+
+	params := &sqlc.CreateUserParams{
+		Username:       username,
+		Email:          email,
 		HashedPassword: hashedPassword,
-		Email:          req.Email,
-		AvatarSrc:      server.config.DefaultAvatarSrc,
+		Avatar:         server.config.AvatarPath + "/default",
+		Role:           role,
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// DeleteUsers
+func (server *Server) DeleteUsers(ctx context.Context, req *pb.DeleteUsersRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	user, err := server.store.CreateUser(ctx, arg)
+	userIDs := util.RemoveDuplicates(req.GetUserIds())
+	for _, userID := range userIDs {
+		if err := util.ValidateID(userID); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
+		}
+		if userID == authUser.ID {
+			return nil, status.Errorf(codes.InvalidArgument, "cannot delete yourself")
+		}
+	}
+
+	nrows, err := server.store.DeleteUsers(ctx, userIDs)
+	if err != nil || int64(len(userIDs)) != nrows {
+		return nil, status.Error(codes.Internal, "failed to delete user")
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// -------------------------------------------------------------------
+// UpdateUser
+func (server *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*emptypb.Empty, error) {
+	arg, err := parseUpdateUserRequest(req)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
+		return nil, err
+	}
+
+	_, err = server.store.UpdateUser(ctx, *arg)
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			switch pgErr.ConstraintName {
+			case "users_username_key":
+				return nil, status.Errorf(codes.AlreadyExists, "username already exists: %s", arg.Username)
+			case "users_email_key":
+				return nil, status.Errorf(codes.AlreadyExists, "email already exists: %s", arg.Email)
 			}
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, status.Error(codes.Internal, "failed to update user")
 	}
-
-	rsp := newUserResponse(&user)
-	ctx.JSON(http.StatusOK, rsp)
+	return &emptypb.Empty{}, nil
 }
 
-// =============================================================
-// loginUser
-type loginUserRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email" binding:"omitempty,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
+func parseUpdateUserRequest(req *pb.UpdateUserRequest) (*sqlc.UpdateUserParams, error) {
+	reqUser := req.GetUser()
 
-type loginUserResponse struct {
-	SessionID             uuid.UUID    `json:"session_id"`
-	AccessToken           string       `json:"access_token"`
-	AccessTokenExpiresAt  time.Time    `json:"access_token_expires_at"`
-	RefreshToken          string       `json:"refresh_token"`
-	RefreshTokenExpiresAt time.Time    `json:"refresh_token_expires_at"`
-	User                  userResponse `json:"user"`
-}
-
-// @Router /api/login [post]
-func (server *Server) loginUser(ctx *gin.Context) {
-	var req loginUserRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+	userID := reqUser.GetId()
+	if err := util.ValidateID(userID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
 	}
 
-	if req.Username == "" && req.Email == "" {
-		err := fmt.Errorf("invalid username or email")
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	arg1 := db.GetUserParams{
-		Username: req.Username,
-		Email:    req.Email,
-	}
-
-	user, err := server.store.GetUser(ctx, arg1)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, errorResponse(err))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	err = util.CheckPassword(req.Password, user.HashedPassword)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
-		return
-	}
-
-	accessToken, accessPayload, err := server.tokenMaker.CreateToken(
-		user.Username,
-		server.config.AccessTokenDuration,
-	)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	refreshToken, refreshPayload, err := server.tokenMaker.CreateToken(
-		user.Username,
-		server.config.RefreshTokenDuration,
-	)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	arg2 := db.CreateSessionParams{
-		ID:           refreshPayload.ID,
-		Username:     user.Username,
-		RefreshToken: refreshToken,
-		UserAgent:    ctx.Request.UserAgent(),
-		ClientIp:     ctx.ClientIP(),
-		IsBlocked:    false,
-		ExpiresAt:    refreshPayload.ExpiredAt,
-	}
-	session, err := server.store.CreateSession(ctx, arg2)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	rsp := loginUserResponse{
-		SessionID:             session.ID,
-		AccessToken:           accessToken,
-		AccessTokenExpiresAt:  accessPayload.ExpiredAt,
-		RefreshToken:          refreshToken,
-		RefreshTokenExpiresAt: refreshPayload.ExpiredAt,
-		User:                  newUserResponse(&user),
-	}
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// getUserSelf
-
-// @Router /api/user [get]
-func (server *Server) getUserSelf(ctx *gin.Context) {
-	authUser := ctx.MustGet(authorizationUserKey).(*db.User)
-
-	rsp := newUserResponse(authUser)
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// updateUserSelf
-type updateUserSelfRequest struct {
-	Password  string `json:"password" binding:"omitempty,min=6"`
-	Email     string `json:"email" binding:"omitempty,email"`
-	AvatarSrc string `json:"avatar_src"`
-}
-
-// @Router /api/user [patch]
-func (server *Server) updateUserSelf(ctx *gin.Context) {
-	var req updateUserSelfRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	authUser := ctx.MustGet(authorizationUserKey).(*db.User)
-
-	arg := db.UpdateUserParams{Username: authUser.Username}
-	if req.Password != "" {
-		hashedPassword, err := util.HashPassword(req.Password)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-			return
-		}
-		arg.SetHashedPassword = true
-		arg.HashedPassword = hashedPassword
-	}
-	if req.Email != "" {
-		arg.SetEmail = true
-		arg.Email = req.Email
-	}
-	if req.AvatarSrc != "" {
-		arg.SetAvatarSrc = true
-		arg.AvatarSrc = req.AvatarSrc
-	}
-
-	user, err := server.store.UpdateUser(ctx, arg)
-	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
+	params := &sqlc.UpdateUserParams{ID: userID}
+	for _, v := range req.GetUpdateMask().GetPaths() {
+		switch v {
+		case "username":
+			username := reqUser.GetUsername()
+			if err := util.ValidateString(username, 3, 50); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
 			}
-		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	rsp := newUserResponse(&user)
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// getUser
-type getUserRequest struct {
-	Username string `uri:"username" binding:"required"`
-}
-
-// @Router /api/admin/users/:username [get]
-func (server *Server) getUser(ctx *gin.Context) {
-	var req getUserRequest
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	arg := db.GetUserParams{
-		Username: req.Username,
-	}
-	user, err := server.store.GetUser(ctx, arg)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, errorResponse(err))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	rsp := newUserResponse(&user)
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// listUsers
-type listUsersRequest struct {
-	PageID   int32 `form:"page_id" binding:"required,min=1"`
-	PageSize int32 `form:"page_size" binding:"required,min=5,max=20"`
-}
-
-// @Router /api/admin/users [get]
-func (server *Server) listUsers(ctx *gin.Context) {
-	var req listUsersRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	arg := db.ListUsersParams{
-		Limit:  req.PageSize,
-		Offset: (req.PageID - 1) * req.PageSize,
-	}
-
-	users, err := server.store.ListUsers(ctx, arg)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	rsp := []userResponse{}
-	for _, user := range users {
-		rsp = append(rsp, newUserResponse(&user))
-	}
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// updateUser
-type updateUserUriRequest struct {
-	Username string `uri:"username" binding:"required"`
-}
-
-type updateUserRequest struct {
-	NewName string `json:"new_name"`
-	Role    string `json:"role" binding:"omitempty,role"`
-}
-
-// @Router /api/admin/users/:username [patch]
-func (server *Server) updateUser(ctx *gin.Context) {
-	var req1 updateUserUriRequest
-	if err := ctx.ShouldBindUri(&req1); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	var req2 updateUserRequest
-	if err := ctx.ShouldBindJSON(&req2); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	arg := db.UpdateUserParams{Username: req1.Username}
-	if req2.NewName != "" {
-		arg.SetNewName = true
-		arg.NewName = req2.NewName
-	}
-	if req2.Role != "" {
-		arg.SetRole = true
-		arg.Role = req2.Role
-	}
-
-	user, err := server.store.UpdateUser(ctx, arg)
-	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
+			params.SetUsername = true
+			params.Username = username
+		case "email":
+			email := reqUser.GetEmail()
+			if err := util.ValidateEmail(email); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
 			}
+			params.SetEmail = true
+			params.Email = email
+		case "password":
+			password := reqUser.GetPassword()
+			if err := util.ValidateString(password, 6, 50); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "password: %s", err.Error())
+			}
+			hashedPassword, err := util.HashPassword(password)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			params.SetPassword = true
+			params.HashedPassword = hashedPassword
+		case "role":
+			role := reqUser.GetRole()
+			if err := util.ValidateOneOf(role, []string{"admin", "author", "user"}); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "role: %s", err.Error())
+			}
+			params.SetRole = true
+			params.Role = role
+		case "is_deleted":
+			params.SetDeleted = true
+			params.IsDeleted = reqUser.GetIsDeleted()
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
 	}
-
-	rsp := newUserResponse(&user)
-	ctx.JSON(http.StatusOK, rsp)
+	return params, nil
 }
 
-// =============================================================
-// deleteUser
-type deleteUserRequest struct {
-	Username string `uri:"username" binding:"required"`
-}
-
-// deleteUser
-// @Router /api/admin/users/:username [delete]
-func (server *Server) deleteUser(ctx *gin.Context) {
-	var req deleteUserRequest
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	err := server.store.DeleteUser(ctx, req.Username)
+// -------------------------------------------------------------------
+// ListUsers
+func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
+	arg, err := parseListUsersRequest(req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, err
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"id": req.Username})
+	users, err := server.store.ListUsers(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list users")
+	}
+
+	rsp := convertListUsers(users)
+	return rsp, nil
+}
+
+func parseListUsersRequest(req *pb.ListUsersRequest) (*sqlc.ListUsersParams, error) {
+	options := []string{"username", "role", "idDeleted", "createAt"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	params := &sqlc.ListUsersParams{
+		Limit:        req.GetPageSize(),
+		Offset:       (req.GetPageId() - 1) * req.GetPageSize(),
+		UsernameAsc:  req.GetOrderBy() == "username" && req.GetOrder() == "asc",
+		UsernameDesc: req.GetOrderBy() == "username" && req.GetOrder() == "desc",
+		RoleAsc:      req.GetOrderBy() == "role" && req.GetOrder() == "asc",
+		RoleDesc:     req.GetOrderBy() == "role" && req.GetOrder() == "desc",
+		DeletedAsc:   req.GetOrderBy() == "idDeleted" && req.GetOrder() == "asc",
+		DeletedDesc:  req.GetOrderBy() == "idDeleted" && req.GetOrder() == "desc",
+		CreateAtAsc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
+		CreateAtDesc: req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
+		AnyKeyword:   req.GetKeyword() == "",
+		Keyword:      "%" + req.GetKeyword() + "%",
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// ChangeProfile
+func (server *Server) ChangeProfile(ctx context.Context, req *pb.ChangeProfileRequest) (*pb.ChangeProfileResponse, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	arg, err := parseChangeProfileRequest(authUser, req)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := server.store.UpdateUser(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to change password")
+	}
+
+	rsp := &pb.ChangeProfileResponse{User: convertUser(user)}
+	return rsp, nil
+}
+
+func parseChangeProfileRequest(user AuthUser, req *pb.ChangeProfileRequest) (*sqlc.UpdateUserParams, error) {
+	reqUser := req.GetUser()
+
+	userID := reqUser.GetId()
+	if userID != user.ID {
+		return nil, status.Error(codes.PermissionDenied, "no permission to change this user")
+	}
+	params := &sqlc.UpdateUserParams{ID: userID}
+	for _, v := range req.GetUpdateMask().GetPaths() {
+		switch v {
+		case "username":
+			username := reqUser.GetUsername()
+			if err := util.ValidateString(username, 3, 50); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
+			}
+			params.SetUsername = true
+			params.Username = username
+		case "email":
+			email := reqUser.GetEmail()
+			if err := util.ValidateEmail(email); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
+			}
+			params.SetEmail = true
+			params.Email = email
+		case "info":
+			info := reqUser.GetInfo()
+			if err := util.ValidateString(info, 1, 150); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "role: %s", err.Error())
+			}
+			params.SetInfo = true
+			params.Info = info
+		}
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// ChangePassword
+func (server *Server) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	arg, err := parseChangePasswordRequest(authUser, req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	_, err = server.store.UpdateUser(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to change password")
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func parseChangePasswordRequest(user AuthUser, req *pb.ChangePasswordRequest) (*sqlc.UpdateUserParams, error) {
+	userID := req.GetUserId()
+	if userID != user.ID {
+		return nil, status.Error(codes.PermissionDenied, "no permission to change this user's password")
+	}
+
+	oldPassword := req.GetOldPassword()
+	if err := util.ValidateString(oldPassword, 6, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "oldPassword: %s", err.Error())
+	}
+	err := util.CheckPassword(oldPassword, user.HashedPassword)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "incorrect old password")
+	}
+
+	newPassword := req.GetNewPassword()
+	if err := util.ValidateString(newPassword, 6, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "newPassword: %s", err.Error())
+	}
+	hashedPassword, err := util.HashPassword(newPassword)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	params := &sqlc.UpdateUserParams{
+		ID:             userID,
+		SetPassword:    true,
+		HashedPassword: hashedPassword,
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// GetUserProfile
+func (server *Server) GetUserProfile(ctx context.Context, req *pb.GetUserProfileRequest) (*pb.GetUserProfileResponse, error) {
+	if err := util.ValidateID(req.GetUserId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
+	}
+
+	arg := sqlc.GetUserProfileParams{
+		UserID: req.GetUserId(),
+		SelfID: req.GetSelfId(),
+	}
+	user, err := server.store.GetUserProfile(ctx, arg)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get user", err)
+	}
+
+	rsp := &pb.GetUserProfileResponse{
+		User: &pb.GetUserProfileResponse_User{
+			Id:             user.ID,
+			Username:       user.Username,
+			Avatar:         user.Avatar,
+			Info:           user.Info,
+			StarCount:      user.StarCount,
+			ViewCount:      user.ViewCount,
+			FollowerCount:  user.FollowerCount,
+			FollowingCount: user.FollowingCount,
+			IsFollowed:     user.Followed.Valid,
+		},
+	}
+	return rsp, nil
 }

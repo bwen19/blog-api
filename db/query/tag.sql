@@ -1,48 +1,65 @@
 -- name: CreateTag :one
-INSERT INTO tags ( name ) VALUES ( $1 )
-RETURNING *;
+INSERT INTO tags (name) VALUES ($1) RETURNING *;
 
--- name: DeleteTag :exec
-DELETE FROM tags WHERE name = $1;
-
--- name: GetTag :one
-SELECT * FROM tags
-WHERE name = $1
-LIMIT 1;
-
--- name: ListTags :many
-SELECT * FROM tags
-ORDER BY count DESC
-LIMIT $1
-OFFSET $2;
+-- name: DeleteTags :execrows
+DELETE FROM tags WHERE id = ANY(@ids::bigint[]);
 
 -- name: UpdateTag :one
 UPDATE tags
-SET
-    name = CASE WHEN @set_new_name::bool
-        THEN @new_name::varchar
-        ELSE name END,
-    count = CASE WHEN @set_count::bool THEN @count::bigint
-        WHEN @add_count::bool THEN count + 1
-        WHEN @minus_count::bool THEN count - 1
-        ELSE count END
-WHERE name = @name::varchar
-RETURNING *;
+SET name = @name::varchar
+WHERE id = $1 RETURNING *;
 
--- name: CreateArticleTag :one
-INSERT INTO article_tags (
-    article_id,
-    tag
-) VALUES (
-    $1, $2
-) RETURNING *;
+-- name: ListTags :many
+WITH Data_CTE AS (
+  SELECT t.id, t.name, count(pt.post_id) post_count
+  FROM tags t
+  LEFT JOIN post_tags pt ON pt.tag_id = t.id
+  GROUP BY t.id, t.name
+),
+Count_CTE AS (
+  SELECT count(*) AS total FROM Data_CTE
+)
+SELECT *
+FROM Data_CTE
+CROSS JOIN Count_CTE
+ORDER BY
+  CASE WHEN @name_asc::bool THEN name END ASC,
+  CASE WHEN @name_desc::bool THEN name END DESC,
+  CASE WHEN @post_count_asc::bool THEN post_count END ASC,
+  CASE WHEN @post_count_desc::bool THEN post_count END DESC,
+  id ASC
+LIMIT $1
+OFFSET $2;
 
--- name: DeleteArticleTag :exec
-DELETE FROM article_tags
-WHERE article_id = $1
-    AND tag = $2;
+-- name: GetTagsByNames :many
+SELECT * FROM tags WHERE name = ANY(@name::varchar[]);
 
--- name: ListArticleTags :many
-SELECT tag FROM article_tags
-WHERE article_id = $1;
+-- name: CreateTags :copyfrom
+INSERT INTO tags (name) VALUES ($1);
 
+-- name: SetPostTags :many
+WITH Tag_CTE AS (
+  SELECT DISTINCT * FROM tags
+  WHERE name = ANY(@tag_names::varchar[])
+), Values_CTE AS (
+  SELECT p.post_id, tc.id tag_id FROM (
+    SELECT id post_id FROM posts WHERE id = @post_id::bigint
+  ) p
+  CROSS JOIN Tag_CTE tc
+), Del_CTE AS (
+  DELETE FROM post_tags
+  WHERE post_id = @post_id::bigint
+    AND tag_id NOT IN (SELECT id FROM Tag_CTE)
+), Ins_CTE AS (
+  INSERT INTO post_tags (post_id, tag_id)
+  SELECT * FROM Values_CTE
+  ON CONFLICT (post_id, tag_id) DO NOTHING
+)
+SELECT * FROM Tag_CTE;
+
+-- name: GetPostTags :many
+SELECT * FROM tags
+WHERE id = ANY(
+  SELECT tag_id FROM post_tags
+  WHERE post_id = $1
+);

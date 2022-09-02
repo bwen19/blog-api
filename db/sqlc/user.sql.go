@@ -3,119 +3,282 @@
 //   sqlc v1.13.0
 // source: user.sql
 
-package db
+package sqlc
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-    username,
-    hashed_password,
-    email,
-    avatar_src
+  username, email, hashed_password, avatar, role
 ) VALUES (
-    $1, $2, $3, $4
-) RETURNING username, hashed_password, email, avatar_src, role, create_at
+  $1, $2, $3, $4, $5
+) RETURNING id, username, email, hashed_password, avatar, info, role, is_deleted, create_at
 `
 
 type CreateUserParams struct {
 	Username       string `json:"username"`
-	HashedPassword string `json:"hashed_password"`
 	Email          string `json:"email"`
-	AvatarSrc      string `json:"avatar_src"`
+	HashedPassword string `json:"hashed_password"`
+	Avatar         string `json:"avatar"`
+	Role           string `json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.Username,
-		arg.HashedPassword,
 		arg.Email,
-		arg.AvatarSrc,
+		arg.HashedPassword,
+		arg.Avatar,
+		arg.Role,
 	)
 	var i User
 	err := row.Scan(
+		&i.ID,
 		&i.Username,
-		&i.HashedPassword,
 		&i.Email,
-		&i.AvatarSrc,
+		&i.HashedPassword,
+		&i.Avatar,
+		&i.Info,
 		&i.Role,
+		&i.IsDeleted,
 		&i.CreateAt,
 	)
 	return i, err
 }
 
-const deleteUser = `-- name: DeleteUser :exec
-DELETE FROM users WHERE username = $1
+const deleteUsers = `-- name: DeleteUsers :execrows
+DELETE FROM users WHERE id = ANY($1::bigint[])
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, username string) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, username)
-	return err
+func (q *Queries) DeleteUsers(ctx context.Context, ids []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUsers, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getUser = `-- name: GetUser :one
-SELECT username, hashed_password, email, avatar_src, role, create_at FROM users
-WHERE username = $1
-  OR email = $2
-LIMIT 1
+SELECT id, username, email, hashed_password, avatar, info, role, is_deleted, create_at FROM users
+WHERE id = $1 LIMIT 1
 `
 
-type GetUserParams struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-}
-
-func (q *Queries) GetUser(ctx context.Context, arg GetUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUser, arg.Username, arg.Email)
+func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRow(ctx, getUser, id)
 	var i User
 	err := row.Scan(
+		&i.ID,
 		&i.Username,
-		&i.HashedPassword,
 		&i.Email,
-		&i.AvatarSrc,
+		&i.HashedPassword,
+		&i.Avatar,
+		&i.Info,
 		&i.Role,
+		&i.IsDeleted,
 		&i.CreateAt,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, username, email, hashed_password, avatar, info, role, is_deleted, create_at FROM users
+WHERE email = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.HashedPassword,
+		&i.Avatar,
+		&i.Info,
+		&i.Role,
+		&i.IsDeleted,
+		&i.CreateAt,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, email, hashed_password, avatar, info, role, is_deleted, create_at FROM users
+WHERE username = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.HashedPassword,
+		&i.Avatar,
+		&i.Info,
+		&i.Role,
+		&i.IsDeleted,
+		&i.CreateAt,
+	)
+	return i, err
+}
+
+const getUserProfile = `-- name: GetUserProfile :one
+WITH SUM_CTE AS (
+  SELECT coalesce(sum(view_count), 0)::bigint view_count,
+    coalesce(sum(star_count), 0)::bigint star_count
+  FROM (
+    SELECT p.id, p.view_count, count(ps.user_id) star_count
+    FROM posts p
+    LEFT JOIN post_stars ps ON ps.post_id = p.id
+    WHERE p.author_id = $1::bigint
+    GROUP BY p.id, p.view_count
+  ) pc
+)
+SELECT u.id, u.username, u.avatar, u.info, sc.view_count,
+  sc.star_count, fu.follower_id followed,
+  (SELECT count(*) FROM follows f
+    WHERE f.user_id = $1::bigint) follower_count,
+  (SELECT count(*) FROM follows f
+    WHERE f.follower_id = $1::bigint) following_count
+FROM users u
+CROSS JOIN SUM_CTE sc
+LEFT JOIN follows fu
+  ON fu.user_id = u.id AND fu.follower_id = $2::bigint
+WHERE u.id = $1::bigint LIMIT 1
+`
+
+type GetUserProfileParams struct {
+	UserID int64 `json:"user_id"`
+	SelfID int64 `json:"self_id"`
+}
+
+type GetUserProfileRow struct {
+	ID             int64         `json:"id"`
+	Username       string        `json:"username"`
+	Avatar         string        `json:"avatar"`
+	Info           string        `json:"info"`
+	ViewCount      int64         `json:"view_count"`
+	StarCount      int64         `json:"star_count"`
+	Followed       sql.NullInt64 `json:"followed"`
+	FollowerCount  int64         `json:"follower_count"`
+	FollowingCount int64         `json:"following_count"`
+}
+
+func (q *Queries) GetUserProfile(ctx context.Context, arg GetUserProfileParams) (GetUserProfileRow, error) {
+	row := q.db.QueryRow(ctx, getUserProfile, arg.UserID, arg.SelfID)
+	var i GetUserProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Avatar,
+		&i.Info,
+		&i.ViewCount,
+		&i.StarCount,
+		&i.Followed,
+		&i.FollowerCount,
+		&i.FollowingCount,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT username, hashed_password, email, avatar_src, role, create_at FROM users
-ORDER BY username
+WITH Data_CTE AS (
+  SELECT id, username, email, avatar, role, is_deleted, create_at
+  FROM users
+  WHERE $11::bool
+    OR username LIKE $12::varchar
+    OR email LIKE $12::varchar
+),
+Count_CTE AS (
+  SELECT count(*) total FROM Data_CTE
+)
+SELECT dc.id, dc.username, dc.email, dc.avatar, dc.role, dc.is_deleted, dc.create_at, cc.total, (
+    SELECT count(*) FROM posts WHERE posts.author_id = dc.id
+  ) post_count
+FROM Data_CTE dc
+CROSS JOIN Count_CTE cc
+ORDER BY
+  CASE WHEN $3::bool THEN username END ASC,
+  CASE WHEN $4::bool THEN username END DESC,
+  CASE WHEN $5::bool THEN role END ASC,
+  CASE WHEN $6::bool THEN role END DESC,
+  CASE WHEN $7::bool THEN is_deleted END ASC,
+  CASE WHEN $8::bool THEN is_deleted END DESC,
+  CASE WHEN $9::bool THEN create_at END ASC,
+  CASE WHEN $10::bool THEN create_at END DESC
 LIMIT $1
 OFFSET $2
 `
 
 type ListUsersParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Limit        int32  `json:"limit"`
+	Offset       int32  `json:"offset"`
+	UsernameAsc  bool   `json:"username_asc"`
+	UsernameDesc bool   `json:"username_desc"`
+	RoleAsc      bool   `json:"role_asc"`
+	RoleDesc     bool   `json:"role_desc"`
+	DeletedAsc   bool   `json:"deleted_asc"`
+	DeletedDesc  bool   `json:"deleted_desc"`
+	CreateAtAsc  bool   `json:"create_at_asc"`
+	CreateAtDesc bool   `json:"create_at_desc"`
+	AnyKeyword   bool   `json:"any_keyword"`
+	Keyword      string `json:"keyword"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers, arg.Limit, arg.Offset)
+type ListUsersRow struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Avatar    string    `json:"avatar"`
+	Role      string    `json:"role"`
+	IsDeleted bool      `json:"is_deleted"`
+	CreateAt  time.Time `json:"create_at"`
+	Total     int64     `json:"total"`
+	PostCount int64     `json:"post_count"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers,
+		arg.Limit,
+		arg.Offset,
+		arg.UsernameAsc,
+		arg.UsernameDesc,
+		arg.RoleAsc,
+		arg.RoleDesc,
+		arg.DeletedAsc,
+		arg.DeletedDesc,
+		arg.CreateAtAsc,
+		arg.CreateAtDesc,
+		arg.AnyKeyword,
+		arg.Keyword,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []User{}
+	items := []ListUsersRow{}
 	for rows.Next() {
-		var i User
+		var i ListUsersRow
 		if err := rows.Scan(
+			&i.ID,
 			&i.Username,
-			&i.HashedPassword,
 			&i.Email,
-			&i.AvatarSrc,
+			&i.Avatar,
 			&i.Role,
+			&i.IsDeleted,
 			&i.CreateAt,
+			&i.Total,
+			&i.PostCount,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -129,57 +292,74 @@ SET
   username = CASE WHEN $2::bool
     THEN $3::varchar
     ELSE username END,
-  hashed_password = CASE WHEN $4::bool
+  email = CASE WHEN $4::bool
     THEN $5::varchar
-    ELSE hashed_password END,
-  email = CASE WHEN $6::bool
-    THEN $7::varchar
     ELSE email END,
-  role = CASE WHEN $8::bool
+  hashed_password = CASE WHEN $6::bool
+    THEN $7::varchar
+    ELSE hashed_password END,
+  avatar = CASE WHEN $8::bool
     THEN $9::varchar
-    ELSE role END,
-  avatar_src = CASE WHEN $10::bool
+    ELSE avatar END,
+  info = CASE WHEN $10::bool
     THEN $11::varchar
-    ELSE avatar_src END
-WHERE username = $1
-RETURNING username, hashed_password, email, avatar_src, role, create_at
+    ELSE info END,
+  role = CASE WHEN $12::bool
+    THEN $13::varchar
+    ELSE role END,
+  is_deleted = CASE WHEN $14::bool
+    THEN $15::bool
+    ELSE is_deleted END
+WHERE id = $1
+RETURNING id, username, email, hashed_password, avatar, info, role, is_deleted, create_at
 `
 
 type UpdateUserParams struct {
-	Username          string `json:"username"`
-	SetNewName        bool   `json:"set_new_name"`
-	NewName           string `json:"new_name"`
-	SetHashedPassword bool   `json:"set_hashed_password"`
-	HashedPassword    string `json:"hashed_password"`
-	SetEmail          bool   `json:"set_email"`
-	Email             string `json:"email"`
-	SetRole           bool   `json:"set_role"`
-	Role              string `json:"role"`
-	SetAvatarSrc      bool   `json:"set_avatar_src"`
-	AvatarSrc         string `json:"avatar_src"`
+	ID             int64  `json:"id"`
+	SetUsername    bool   `json:"set_username"`
+	Username       string `json:"username"`
+	SetEmail       bool   `json:"set_email"`
+	Email          string `json:"email"`
+	SetPassword    bool   `json:"set_password"`
+	HashedPassword string `json:"hashed_password"`
+	SetAvatar      bool   `json:"set_avatar"`
+	Avatar         string `json:"avatar"`
+	SetInfo        bool   `json:"set_info"`
+	Info           string `json:"info"`
+	SetRole        bool   `json:"set_role"`
+	Role           string `json:"role"`
+	SetDeleted     bool   `json:"set_deleted"`
+	IsDeleted      bool   `json:"is_deleted"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser,
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.ID,
+		arg.SetUsername,
 		arg.Username,
-		arg.SetNewName,
-		arg.NewName,
-		arg.SetHashedPassword,
-		arg.HashedPassword,
 		arg.SetEmail,
 		arg.Email,
+		arg.SetPassword,
+		arg.HashedPassword,
+		arg.SetAvatar,
+		arg.Avatar,
+		arg.SetInfo,
+		arg.Info,
 		arg.SetRole,
 		arg.Role,
-		arg.SetAvatarSrc,
-		arg.AvatarSrc,
+		arg.SetDeleted,
+		arg.IsDeleted,
 	)
 	var i User
 	err := row.Scan(
+		&i.ID,
 		&i.Username,
-		&i.HashedPassword,
 		&i.Email,
-		&i.AvatarSrc,
+		&i.HashedPassword,
+		&i.Avatar,
+		&i.Info,
 		&i.Role,
+		&i.IsDeleted,
 		&i.CreateAt,
 	)
 	return i, err
