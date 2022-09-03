@@ -6,6 +6,7 @@ import (
 	"blog/server/util"
 	"context"
 	"database/sql"
+	"log"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,14 +21,30 @@ func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRe
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg, err := parseCreateCommentRequest(authUser, req)
+	arg1, err := parseCreateCommentRequest(authUser, req)
 	if err != nil {
 		return nil, err
 	}
 
-	comment, err := server.store.CreateComment(ctx, *arg)
+	comment, err := server.store.CreateComment(ctx, *arg1)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create comment")
+	}
+
+	userID := comment.AuthorID
+	if comment.ReplyUserID.Valid {
+		userID = comment.ReplyUserID.Int64
+	}
+	arg2 := sqlc.CreateNotificationParams{
+		UserID:  userID,
+		Kind:    "reply",
+		Title:   "New Comment at You",
+		Content: comment.Content,
+	}
+
+	err = server.store.CreateNotification(ctx, arg2)
+	if err != nil {
+		log.Println("failed to create new notification for withdrawing post")
 	}
 
 	rsp := convertCreateComment(comment, authUser.User)
@@ -86,7 +103,12 @@ func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRe
 // -------------------------------------------------------------------
 // ListComments
 func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequest) (*pb.ListCommentsResponse, error) {
-	arg, err := parseListCommentsRequest(req)
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
+	arg, err := parseListCommentsRequest(authUser, req)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +122,7 @@ func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequ
 	return rsp, nil
 }
 
-func parseListCommentsRequest(req *pb.ListCommentsRequest) (*sqlc.ListCommentsParams, error) {
+func parseListCommentsRequest(user AuthUser, req *pb.ListCommentsRequest) (*sqlc.ListCommentsParams, error) {
 	options := []string{"createAt", "starCount"}
 	err := util.ValidatePageOrder(req, options)
 	if err != nil {
@@ -116,7 +138,7 @@ func parseListCommentsRequest(req *pb.ListCommentsRequest) (*sqlc.ListCommentsPa
 		Limit:         req.GetPageSize(),
 		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
 		PostID:        postID,
-		SelfID:        req.GetSelfId(),
+		SelfID:        user.ID,
 		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
 		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
 		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
@@ -128,7 +150,12 @@ func parseListCommentsRequest(req *pb.ListCommentsRequest) (*sqlc.ListCommentsPa
 // -------------------------------------------------------------------
 // ListReplies
 func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesRequest) (*pb.ListRepliesResponse, error) {
-	arg, err := parseListRepliesRequest(req)
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
+	arg, err := parseListRepliesRequest(authUser, req)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +169,7 @@ func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesReques
 	return rsp, nil
 }
 
-func parseListRepliesRequest(req *pb.ListRepliesRequest) (*sqlc.ListRepliesParams, error) {
+func parseListRepliesRequest(user AuthUser, req *pb.ListRepliesRequest) (*sqlc.ListRepliesParams, error) {
 	options := []string{"createAt", "starCount"}
 	err := util.ValidatePageOrder(req, options)
 	if err != nil {
@@ -158,7 +185,7 @@ func parseListRepliesRequest(req *pb.ListRepliesRequest) (*sqlc.ListRepliesParam
 		Limit:         req.GetPageSize(),
 		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
 		ParentID:      commentID,
-		SelfID:        req.GetSelfId(),
+		SelfID:        user.ID,
 		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
 		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
 		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",

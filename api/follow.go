@@ -66,14 +66,14 @@ func (server *Server) ListFollows(ctx context.Context, req *pb.ListFollowsReques
 	if req.GetIsFollower() {
 		followers, err := server.store.ListFollowers(ctx, *arg1)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list follows", err)
+			return nil, status.Error(codes.Internal, "failed to list follows")
 		}
 		rsp = convertListFollowers(followers)
 	} else {
 		arg2 := sqlc.ListFollowingsParams(*arg1)
 		followings, err := server.store.ListFollowings(ctx, arg2)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to list follows", err)
+			return nil, status.Error(codes.Internal, "failed to list follows")
 		}
 		rsp = convertListFollowings(followings)
 	}

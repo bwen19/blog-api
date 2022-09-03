@@ -5,13 +5,13 @@ INSERT INTO categories (name) VALUES ($1) RETURNING *;
 DELETE FROM categories WHERE id = ANY(@ids::bigint[]);
 
 -- name: UpdateCategory :one
-UPDATE categories
-SET name = @name::varchar
+UPDATE categories SET name = @name::varchar
 WHERE id = $1 RETURNING *;
 
 -- name: ListCategories :many
 SELECT c.id, c.name,
-  (SELECT count(*) FROM post_categories WHERE category_id = c.id) post_count
+  (SELECT count(*) FROM post_categories
+    WHERE category_id = c.id) post_count
 FROM categories c
 ORDER BY
   CASE WHEN @name_asc::bool THEN name END ASC,
@@ -28,7 +28,8 @@ WITH Category_CTE AS (
   WHERE id = ANY(@category_ids::bigint[])
 ), Values_CTE AS (
   SELECT p.post_id, cc.id category_id FROM (
-    SELECT id post_id FROM posts WHERE id = @post_id::bigint
+    SELECT id post_id FROM posts
+    WHERE id = @post_id::bigint
   ) p
   CROSS JOIN Category_CTE cc
 ), Del_CTE AS (

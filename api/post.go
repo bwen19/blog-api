@@ -5,6 +5,9 @@ import (
 	"blog/server/pb"
 	"blog/server/util"
 	"context"
+	"database/sql"
+	"fmt"
+	"log"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -204,29 +207,29 @@ func parseUpdatePostRequest(user AuthUser, req *pb.UpdatePostRequest) (*sqlc.Upd
 	for _, v := range req.GetUpdateMask().GetPaths() {
 		switch v {
 		case "title":
-			if err := util.ValidateString(reqPost.GetTitle(), 1, 200); err != nil {
+			title := reqPost.GetTitle()
+			if err := util.ValidateString(title, 1, 200); err != nil {
 				return nil, nil, status.Errorf(codes.InvalidArgument, "title: %s", err.Error())
 			}
-			params1.SetTitle = true
-			params1.Title = reqPost.GetTitle()
+			params1.Title = sql.NullString{String: title, Valid: true}
 		case "abstract":
-			if reqPost.GetAbstract() == "" {
+			abstract := reqPost.GetAbstract()
+			if abstract == "" {
 				return nil, nil, status.Error(codes.InvalidArgument, "abstract: must be a non empty string")
 			}
-			params1.SetAbstract = true
-			params1.Abstract = reqPost.GetAbstract()
+			params1.Abstract = sql.NullString{String: abstract, Valid: true}
 		case "cover_image":
-			if reqPost.GetCoverImage() == "" {
+			coverImage := reqPost.GetCoverImage()
+			if coverImage == "" {
 				return nil, nil, status.Error(codes.InvalidArgument, "coverImage: must be a non empty path")
 			}
-			params1.SetCoverImage = true
-			params1.CoverImage = reqPost.GetCoverImage()
+			params1.CoverImage = sql.NullString{String: coverImage, Valid: true}
 		case "content":
-			if reqPost.GetContent() == "" {
+			content := reqPost.GetContent()
+			if content == "" {
 				return nil, nil, status.Error(codes.InvalidArgument, "content: must be a non empty content")
 			}
-			params1.SetContent = true
-			params1.Content = reqPost.GetContent()
+			params1.Content = sql.NullString{String: content, Valid: true}
 		case "category_ids":
 			categoryIDs := reqPost.GetCategoryIds()
 			if len(categoryIDs) > 2 {
@@ -259,9 +262,9 @@ func parseUpdatePostRequest(user AuthUser, req *pb.UpdatePostRequest) (*sqlc.Upd
 // -------------------------------------------------------------------
 // ListPosts
 func (server *Server) ListPosts(ctx context.Context, req *pb.ListPostsRequest) (*pb.ListPostsResponse, error) {
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	arg, err := parseListPostsRequest(authUser, req)
@@ -304,9 +307,9 @@ func parseListPostsRequest(user AuthUser, req *pb.ListPostsRequest) (*sqlc.ListP
 // -------------------------------------------------------------------
 // SubmitPost
 func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest) (*emptypb.Empty, error) {
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	postIDs := util.RemoveDuplicates(req.GetPostIds())
@@ -316,14 +319,32 @@ func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest)
 		}
 	}
 
-	arg := sqlc.SubmitPostParams{
+	arg1 := sqlc.SubmitPostParams{
 		Ids:      postIDs,
 		AuthorID: authUser.ID,
 	}
 
-	nrows, err := server.store.SubmitPost(ctx, arg)
-	if err != nil || int64(len(postIDs)) != nrows {
+	submitIDs, err := server.store.SubmitPost(ctx, arg1)
+	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to submit posts")
+	}
+
+	for _, postID := range submitIDs {
+		arg2 := sqlc.CreateNotificationParams{
+			UserID:  authUser.ID,
+			Kind:    "admin",
+			Title:   "New post submitted",
+			Content: fmt.Sprintf("PostID %v has been submitted", postID),
+		}
+
+		err = server.store.CreateNotification(ctx, arg2)
+		if err != nil {
+			log.Println("failed to create new notification for submitting post")
+		}
+	}
+
+	if len(submitIDs) != len(postIDs) {
+		return nil, status.Error(codes.Internal, "some submissions failed")
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -365,9 +386,27 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 		}
 	}
 
-	nrows, err := server.store.PublishPost(ctx, postIDs)
-	if err != nil || int64(len(postIDs)) != nrows {
+	publishPosts, err := server.store.PublishPost(ctx, postIDs)
+	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to publish posts")
+	}
+
+	for _, post := range publishPosts {
+		arg := sqlc.CreateNotificationParams{
+			UserID:  post.AuthorID,
+			Kind:    "system",
+			Title:   "New post published",
+			Content: fmt.Sprintf("Congratulations! PostID %v has been published", post.ID),
+		}
+
+		err = server.store.CreateNotification(ctx, arg)
+		if err != nil {
+			log.Println("failed to create new notification for publishing post")
+		}
+	}
+
+	if len(publishPosts) != len(postIDs) {
+		return nil, status.Error(codes.Internal, "some publications failed")
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -382,9 +421,27 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 		}
 	}
 
-	nrows, err := server.store.WithdrawPost(ctx, postIDs)
-	if err != nil || int64(len(postIDs)) != nrows {
+	withdrawPosts, err := server.store.WithdrawPost(ctx, postIDs)
+	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to withdraw posts")
+	}
+
+	for _, post := range withdrawPosts {
+		arg := sqlc.CreateNotificationParams{
+			UserID:  post.AuthorID,
+			Kind:    "system",
+			Title:   "Post withdrawn",
+			Content: fmt.Sprintf("PostID %v has been withdrawn", post.ID),
+		}
+
+		err = server.store.CreateNotification(ctx, arg)
+		if err != nil {
+			log.Println("failed to create new notification for withdrawing post")
+		}
+	}
+
+	if len(withdrawPosts) != len(postIDs) {
+		return nil, status.Error(codes.Internal, "some withdrawal failed")
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -432,12 +489,7 @@ func (server *Server) ChangePost(ctx context.Context, req *pb.ChangePostRequest)
 // -------------------------------------------------------------------
 // GetPosts
 func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*pb.GetPostsResponse, error) {
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
-	}
-
-	arg, err := parseGetPostsRequest(authUser, req)
+	arg, err := parseGetPostsRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +503,7 @@ func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*p
 	return rsp, nil
 }
 
-func parseGetPostsRequest(user AuthUser, req *pb.GetPostsRequest) (*sqlc.GetPostsParams, error) {
+func parseGetPostsRequest(req *pb.GetPostsRequest) (*sqlc.GetPostsParams, error) {
 	options := []string{"publishAt", "updateAt"}
 	err := util.ValidatePageOrder(req, options)
 	if err != nil {
@@ -511,7 +563,12 @@ func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*e
 // -------------------------------------------------------------------
 // FetchPosts
 func (server *Server) FetchPosts(ctx context.Context, req *pb.FetchPostsRequest) (*pb.FetchPostsResponse, error) {
-	arg, err := parseFetchPostsRequest(req)
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
+	arg, err := parseFetchPostsRequest(authUser, req)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +582,7 @@ func (server *Server) FetchPosts(ctx context.Context, req *pb.FetchPostsRequest)
 	return rsp, nil
 }
 
-func parseFetchPostsRequest(req *pb.FetchPostsRequest) (*sqlc.FetchPostsParams, error) {
+func parseFetchPostsRequest(user AuthUser, req *pb.FetchPostsRequest) (*sqlc.FetchPostsParams, error) {
 	options := []string{"viewCount", "publishAt"}
 	err := util.ValidatePageOrder(req, options)
 	if err != nil {
@@ -535,7 +592,7 @@ func parseFetchPostsRequest(req *pb.FetchPostsRequest) (*sqlc.FetchPostsParams, 
 	params := &sqlc.FetchPostsParams{
 		Limit:         req.GetPageSize(),
 		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
-		SelfID:        req.GetSelfId(),
+		SelfID:        user.ID,
 		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
 		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
 		PublishAtAsc:  req.GetOrderBy() == "publishAt" && req.GetOrder() == "asc",
@@ -557,19 +614,19 @@ func parseFetchPostsRequest(req *pb.FetchPostsRequest) (*sqlc.FetchPostsParams, 
 // -------------------------------------------------------------------
 // ReadPost
 func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*pb.ReadPostResponse, error) {
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
 	postID := req.GetPostId()
 	if err := util.ValidateID(postID); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
 	}
 
-	err := server.store.IncreaseViewCount(ctx, postID)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to update post view count")
-	}
-
 	arg := sqlc.ReadPostParams{
 		PostID: postID,
-		SelfID: req.GetSelfId(),
+		SelfID: authUser.ID,
 	}
 	post, err := server.store.ReadPost(ctx, arg)
 	if err != nil {

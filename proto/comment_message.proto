@@ -32,7 +32,6 @@ message ListCommentsRequest {
     string order = 3;
     string orderBy = 4;
     int64 post_id = 5;
-    int64 self_id = 6;
 }
 message ListCommentsResponse {
     int64 total = 1;
@@ -46,7 +45,6 @@ message ListRepliesRequest {
     string order = 3;
     string orderBy = 4;
     int64 comment_id =5;
-    int64 self_id = 6;
 }
 message ListRepliesResponse {
     int64 total = 1;

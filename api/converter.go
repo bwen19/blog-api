@@ -67,7 +67,7 @@ func convertListSessions(sessions []sqlc.ListSessionsRow) *pb.ListSessionsRespon
 	}
 }
 
-func convertListNotifs(notifs []sqlc.ListNotificationsRow, numRead int64) *pb.ListNotifsResponse {
+func convertListNotifs(notifs []sqlc.ListNotificationsRow) *pb.ListNotifsResponse {
 	if len(notifs) == 0 {
 		return &pb.ListNotifsResponse{}
 	}
@@ -87,8 +87,39 @@ func convertListNotifs(notifs []sqlc.ListNotificationsRow, numRead int64) *pb.Li
 
 	return &pb.ListNotifsResponse{
 		Total:         notifs[0].Total,
-		UnreadCount:   notifs[0].UnreadCount - numRead,
+		UnreadCount:   notifs[0].UnreadCount,
 		Notifications: rspNotifs,
+	}
+}
+
+func convertLisMessages(messages []sqlc.ListMessagesRow) *pb.ListMessagesResponse {
+	if len(messages) == 0 {
+		return &pb.ListMessagesResponse{}
+	}
+
+	rspMessages := make([]*pb.ListMessagesResponse_MessageItem, 0, 5)
+	for _, msg := range messages {
+		user := &pb.User{
+			Id:       msg.UserID,
+			Username: msg.Username,
+			Avatar:   msg.Avatar,
+			Email:    msg.Email,
+		}
+		pbMsg := &pb.ListMessagesResponse_MessageItem{
+			Id:       msg.ID,
+			Kind:     msg.Kind,
+			Title:    msg.Title,
+			User:     user,
+			Content:  msg.Content,
+			Unread:   msg.Unread,
+			CreateAt: timestamppb.New(msg.CreateAt),
+		}
+		rspMessages = append(rspMessages, pbMsg)
+	}
+
+	return &pb.ListMessagesResponse{
+		Total:    messages[0].Total,
+		Messages: rspMessages,
 	}
 }
 

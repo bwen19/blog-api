@@ -129,7 +129,7 @@ service Blog {
     // GetUserProfile
     rpc GetUserProfile (GetUserProfileRequest) returns (GetUserProfileResponse) {
         option (google.api.http) = {
-            get: "/api/user/profile"
+            get: "/api/user/{user_id}/profile"
         };
     }
 
@@ -137,6 +137,13 @@ service Blog {
     rpc MarkAllRead (google.protobuf.Empty) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             put: "/api/notification/read"
+        };
+    }
+    // LeaveMessage
+    rpc LeaveMessage (LeaveMessageRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/api/notification"
+            body: "*"
         };
     }
     // DeleteNotifs
@@ -150,6 +157,18 @@ service Blog {
     rpc ListNotifs (ListNotifsRequest) returns (ListNotifsResponse) {
         option (google.api.http) = {
             get: "/api/notification"
+        };
+    }
+    // ListMessages
+    rpc ListMessages (ListMessagesRequest) returns (ListMessagesResponse) {
+        option (google.api.http) = {
+            get: "/api/notification/admin"
+        };
+    }
+    // CheckMessages
+    rpc CheckMessages (CheckMessagesRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/api/notification/admin"
         };
     }
 

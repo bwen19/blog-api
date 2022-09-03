@@ -11,27 +11,13 @@ DELETE FROM users WHERE id = ANY(@ids::bigint[]);
 -- name: UpdateUser :one
 UPDATE users
 SET
-  username = CASE WHEN @set_username::bool
-    THEN @username::varchar
-    ELSE username END,
-  email = CASE WHEN @set_email::bool
-    THEN @email::varchar
-    ELSE email END,
-  hashed_password = CASE WHEN @set_password::bool
-    THEN @hashed_password::varchar
-    ELSE hashed_password END,
-  avatar = CASE WHEN @set_avatar::bool
-    THEN @avatar::varchar
-    ELSE avatar END,
-  info = CASE WHEN @set_info::bool
-    THEN @info::varchar
-    ELSE info END,
-  role = CASE WHEN @set_role::bool
-    THEN @role::varchar
-    ELSE role END,
-  is_deleted = CASE WHEN @set_deleted::bool
-    THEN @is_deleted::bool
-    ELSE is_deleted END
+  username = coalesce(sqlc.narg('username'), username),
+  email = coalesce(sqlc.narg('email'), email),
+  hashed_password = coalesce(sqlc.narg('hashed_password'), hashed_password),
+  avatar = coalesce(sqlc.narg('avatar'), avatar),
+  info = coalesce(sqlc.narg('info'), info),
+  role = coalesce(sqlc.narg('role'), role),
+  is_deleted = coalesce(sqlc.narg('is_deleted'), is_deleted)
 WHERE id = $1
 RETURNING *;
 

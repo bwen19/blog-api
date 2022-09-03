@@ -5,8 +5,7 @@ INSERT INTO tags (name) VALUES ($1) RETURNING *;
 DELETE FROM tags WHERE id = ANY(@ids::bigint[]);
 
 -- name: UpdateTag :one
-UPDATE tags
-SET name = @name::varchar
+UPDATE tags SET name = @name::varchar
 WHERE id = $1 RETURNING *;
 
 -- name: ListTags :many

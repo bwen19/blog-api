@@ -5,6 +5,7 @@ import (
 	"blog/server/pb"
 	"blog/server/util"
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
@@ -110,9 +111,9 @@ func (server *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			switch pgErr.ConstraintName {
 			case "users_username_key":
-				return nil, status.Errorf(codes.AlreadyExists, "username already exists: %s", arg.Username)
+				return nil, status.Errorf(codes.AlreadyExists, "username already exists: %s", arg.Username.String)
 			case "users_email_key":
-				return nil, status.Errorf(codes.AlreadyExists, "email already exists: %s", arg.Email)
+				return nil, status.Errorf(codes.AlreadyExists, "email already exists: %s", arg.Email.String)
 			}
 		}
 		return nil, status.Error(codes.Internal, "failed to update user")
@@ -136,15 +137,13 @@ func parseUpdateUserRequest(req *pb.UpdateUserRequest) (*sqlc.UpdateUserParams, 
 			if err := util.ValidateString(username, 3, 50); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
 			}
-			params.SetUsername = true
-			params.Username = username
+			params.Username = sql.NullString{String: username, Valid: true}
 		case "email":
 			email := reqUser.GetEmail()
 			if err := util.ValidateEmail(email); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
 			}
-			params.SetEmail = true
-			params.Email = email
+			params.Email = sql.NullString{String: email, Valid: true}
 		case "password":
 			password := reqUser.GetPassword()
 			if err := util.ValidateString(password, 6, 50); err != nil {
@@ -154,18 +153,15 @@ func parseUpdateUserRequest(req *pb.UpdateUserRequest) (*sqlc.UpdateUserParams, 
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			params.SetPassword = true
-			params.HashedPassword = hashedPassword
+			params.HashedPassword = sql.NullString{String: hashedPassword, Valid: true}
 		case "role":
 			role := reqUser.GetRole()
 			if err := util.ValidateOneOf(role, []string{"admin", "author", "user"}); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "role: %s", err.Error())
 			}
-			params.SetRole = true
-			params.Role = role
+			params.Role = sql.NullString{String: role, Valid: true}
 		case "is_deleted":
-			params.SetDeleted = true
-			params.IsDeleted = reqUser.GetIsDeleted()
+			params.IsDeleted = sql.NullBool{Bool: req.User.GetIsDeleted(), Valid: true}
 		}
 	}
 	return params, nil
@@ -248,22 +244,19 @@ func parseChangeProfileRequest(user AuthUser, req *pb.ChangeProfileRequest) (*sq
 			if err := util.ValidateString(username, 3, 50); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
 			}
-			params.SetUsername = true
-			params.Username = username
+			params.Username = sql.NullString{String: username, Valid: true}
 		case "email":
 			email := reqUser.GetEmail()
 			if err := util.ValidateEmail(email); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
 			}
-			params.SetEmail = true
-			params.Email = email
+			params.Email = sql.NullString{String: email, Valid: true}
 		case "info":
 			info := reqUser.GetInfo()
 			if err := util.ValidateString(info, 1, 150); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "role: %s", err.Error())
 			}
-			params.SetInfo = true
-			params.Info = info
+			params.Info = sql.NullString{String: info, Valid: true}
 		}
 	}
 	return params, nil
@@ -315,8 +308,7 @@ func parseChangePasswordRequest(user AuthUser, req *pb.ChangePasswordRequest) (*
 
 	params := &sqlc.UpdateUserParams{
 		ID:             userID,
-		SetPassword:    true,
-		HashedPassword: hashedPassword,
+		HashedPassword: sql.NullString{String: hashedPassword, Valid: true},
 	}
 	return params, nil
 }
@@ -324,20 +316,25 @@ func parseChangePasswordRequest(user AuthUser, req *pb.ChangePasswordRequest) (*
 // -------------------------------------------------------------------
 // GetUserProfile
 func (server *Server) GetUserProfile(ctx context.Context, req *pb.GetUserProfileRequest) (*pb.GetUserProfileResponse, error) {
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
 	if err := util.ValidateID(req.GetUserId()); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
 	}
 
 	arg := sqlc.GetUserProfileParams{
 		UserID: req.GetUserId(),
-		SelfID: req.GetSelfId(),
+		SelfID: authUser.ID,
 	}
 	user, err := server.store.GetUserProfile(ctx, arg)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, status.Error(codes.NotFound, "user not found")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to get user", err)
+		return nil, status.Error(codes.Internal, "failed to get user")
 	}
 
 	rsp := &pb.GetUserProfileResponse{

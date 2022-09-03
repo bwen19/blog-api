@@ -5,13 +5,18 @@ WITH Ins_CTE AS (
   )
   VALUES ($1, $2, $3, $4, $5) RETURNING *
 )
-SELECT ic.*, ru.username r_username, ru.avatar r_avatar,
-  ru.info r_info, fu.user_id r_followed,
-  (SELECT count(*) FROM follows f WHERE f.user_id = ic.reply_user_id) r_follower_count,
-  (SELECT count(*) FROM follows f WHERE f.follower_id = ic.reply_user_id) r_following_count,
-  (SELECT count(*) FROM follows f WHERE f.user_id = ic.user_id) follower_count,
-  (SELECT count(*) FROM follows f WHERE f.follower_id = ic.user_id ) following_count
+SELECT ic.*, p.author_id, ru.username r_username,
+    ru.avatar r_avatar, ru.info r_info, fu.user_id r_followed,
+    (SELECT count(*) FROM follows f
+      WHERE f.user_id = ic.reply_user_id) r_follower_count,
+    (SELECT count(*) FROM follows f
+      WHERE f.follower_id = ic.reply_user_id) r_following_count,
+    (SELECT count(*) FROM follows f
+      WHERE f.user_id = ic.user_id) follower_count,
+    (SELECT count(*) FROM follows f
+      WHERE f.follower_id = ic.user_id ) following_count
 FROM Ins_CTE ic
+JOIN posts p ON p.id = ic.post_id
 LEFT JOIN users ru ON ru.id = ic.reply_user_id
 LEFT JOIN follows fu
   ON fu.user_id = ic.reply_user_id AND fu.follower_id = ic.user_id;
@@ -26,7 +31,8 @@ WITH Data_CTE AS (
   FROM comments cm
   LEFT JOIN comment_stars cms ON cms.comment_id = cm.id
   WHERE post_id = @post_id::bigint
-  GROUP BY id, post_id, cm.user_id, parent_id, reply_user_id, content, create_at
+  GROUP BY id, post_id, cm.user_id, parent_id, reply_user_id,
+      content, create_at
 ),
 Count_CTE AS (
   SELECT sum(CASE WHEN parent_id IS NULL THEN 1 ELSE 0 END) total,

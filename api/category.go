@@ -103,7 +103,7 @@ func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategories
 
 	categories, err := server.store.ListCategories(ctx, *arg)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list categories", err)
+		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
 
 	rsp := convertListCategories(categories)

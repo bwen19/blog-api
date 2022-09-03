@@ -76,7 +76,6 @@ message ChangePasswordRequest {
 
 message GetUserProfileRequest {
     int64 user_id = 1;
-    int64 self_id = 2;
 }
 message GetUserProfileResponse {
     message User {

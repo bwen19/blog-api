@@ -13,18 +13,10 @@ WHERE id = ANY(@ids::bigint[]) AND author_id = @author_id::bigint
 -- name: UpdatePost :one
 UPDATE posts
 SET
-  title = CASE WHEN @set_title::bool
-    THEN @title::varchar
-    ELSE title END,
-  abstract = CASE WHEN @set_abstract::bool
-    THEN @abstract::varchar
-    ELSE abstract END,
-  cover_image = CASE WHEN @set_cover_image::bool
-    THEN @cover_image::varchar
-    ELSE cover_image END,
-  content = CASE WHEN @set_content::bool
-    THEN @content::varchar
-    ELSE content END,
+  title = coalesce(sqlc.narg('title'), title),
+  abstract = coalesce(sqlc.narg('abstract'), abstract),
+  cover_image = coalesce(sqlc.narg('cover_image'), cover_image),
+  content = coalesce(sqlc.narg('content'), content),
   update_at = now()
 WHERE id = $1 AND author_id = @author_id::bigint
   AND status = ANY('{draft, revise}'::varchar[])
@@ -51,10 +43,11 @@ ORDER BY
 LIMIT $1
 OFFSET $2;
 
--- name: SubmitPost :execrows
+-- name: SubmitPost :many
 UPDATE posts SET status = 'review'
 WHERE id = ANY(@ids::bigint[]) AND author_id = @author_id::bigint
-  AND status = ANY('{draft, revise}'::varchar[]);
+  AND status = ANY('{draft, revise}'::varchar[])
+RETURNING id;
 
 -- name: ReviewPost :one
 WITH Category_CTE AS (
@@ -84,14 +77,16 @@ WHERE p.id = @post_id::bigint
   AND (@is_admin::bool OR author_id = @author_id::bigint)
 LIMIT 1;
 
--- name: PublishPost :execrows
+-- name: PublishPost :many
 UPDATE posts SET status = 'publish'
-WHERE id = ANY(@ids::bigint[]) AND status = 'review';
+WHERE id = ANY(@ids::bigint[]) AND status = 'review'
+RETURNING id, author_id;
 
--- name: WithdrawPost :execrows
+-- name: WithdrawPost :many
 UPDATE posts SET status = 'revise'
 WHERE id = ANY(@ids::bigint[])
-  AND status = ANY('{review, publish}'::varchar[]);
+  AND status = ANY('{review, publish}'::varchar[])
+RETURNING id, author_id;
 
 -- name: FeaturePost :execrows
 UPDATE posts SET is_featured = @is_featured::bool
@@ -185,12 +180,14 @@ ORDER BY
 LIMIT $1
 OFFSET $2;
 
--- name: IncreaseViewCount :exec
-UPDATE posts SET view_count = view_count + 1
-WHERE id = $1 AND status = 'publish';
-
 -- name: ReadPost :one
-WITH Category_CTE AS (
+WITH Post_CTE AS (
+  UPDATE posts
+  SET view_count = view_count + 1
+  WHERE id = @post_id::bigint  AND status = 'publish'
+  RETURNING *
+),
+Category_CTE AS (
   SELECT post_id,
       array_agg(category_id)::bigint[] category_ids,
       array_agg(name)::varchar[] category_names
@@ -218,13 +215,12 @@ SELECT p.id, p.title, p.cover_image, p.content, p.view_count,
       WHERE f.follower_id = p.author_id) following_count,
     (SELECT count(*) FROM post_stars ps
       WHERE ps.post_id = @post_id::bigint) star_count
-FROM posts p JOIN users u ON u.id = p.author_id
+FROM Post_CTE p
+JOIN users u ON u.id = p.author_id
 LEFT JOIN Category_CTE cc ON cc.post_id = p.id
 LEFT JOIN Tag_CTE tc ON tc.post_id = p.id
 LEFT JOIN follows fu
-  ON fu.user_id = p.author_id AND fu.follower_id = @self_id::bigint
-WHERE p.id = @post_id::bigint AND p.status = 'publish'
-LIMIT 1;
+  ON fu.user_id = p.author_id AND fu.follower_id = @self_id::bigint;
 
 -- name: CreatePostStar :exec
 INSERT INTO post_stars (post_id, user_id)

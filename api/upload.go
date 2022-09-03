@@ -3,6 +3,7 @@ package api
 import (
 	"blog/server/db/sqlc"
 	"blog/server/pb"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -81,9 +82,8 @@ func (server *Server) UploadAvatar(w http.ResponseWriter, r *http.Request, authU
 
 	// update avatar src of user in database
 	arg := sqlc.UpdateUserParams{
-		ID:        authUser.ID,
-		SetAvatar: true,
-		Avatar:    filename,
+		ID:     authUser.ID,
+		Avatar: sql.NullString{String: filename, Valid: true},
 	}
 	user, err := server.store.UpdateUser(r.Context(), arg)
 	if err != nil {

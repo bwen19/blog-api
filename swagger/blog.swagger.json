@@ -403,13 +403,6 @@
             "required": false,
             "type": "string",
             "format": "int64"
-          },
-          {
-            "name": "selfId",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
           }
         ],
         "tags": [
@@ -495,13 +488,6 @@
           },
           {
             "name": "commentId",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
-          },
-          {
-            "name": "selfId",
             "in": "query",
             "required": false,
             "type": "string",
@@ -735,6 +721,110 @@
         "tags": [
           "Blog"
         ]
+      },
+      "post": {
+        "summary": "LeaveMessage",
+        "operationId": "Blog_LeaveMessage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbLeaveMessageRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/notification/admin": {
+      "get": {
+        "summary": "ListMessages",
+        "operationId": "Blog_ListMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListMessagesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "put": {
+        "summary": "CheckMessages",
+        "operationId": "Blog_CheckMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "messageIds",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "int64"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
       }
     },
     "/api/notification/read": {
@@ -813,13 +903,6 @@
           },
           {
             "name": "authorId",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
-          },
-          {
-            "name": "selfId",
             "in": "query",
             "required": false,
             "type": "string",
@@ -1156,13 +1239,6 @@
             "name": "postId",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
-          },
-          {
-            "name": "selfId",
-            "in": "query",
-            "required": false,
             "type": "string",
             "format": "int64"
           }
@@ -1770,45 +1846,6 @@
         ]
       }
     },
-    "/api/user/profile": {
-      "get": {
-        "summary": "GetUserProfile",
-        "operationId": "Blog_GetUserProfile",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/pbGetUserProfileResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
-          },
-          {
-            "name": "selfId",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
-          }
-        ],
-        "tags": [
-          "Blog"
-        ]
-      }
-    },
     "/api/user/{user.id}": {
       "patch": {
         "summary": "UpdateUser",
@@ -1976,6 +2013,38 @@
           "Blog"
         ]
       }
+    },
+    "/api/user/{userId}/profile": {
+      "get": {
+        "summary": "GetUserProfile",
+        "operationId": "Blog_GetUserProfile",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetUserProfileResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
     }
   },
   "definitions": {
@@ -1992,6 +2061,34 @@
         "postCount": {
           "type": "string",
           "format": "int64"
+        }
+      }
+    },
+    "ListMessagesResponseMessageItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/definitions/pbUser"
+        },
+        "content": {
+          "type": "string"
+        },
+        "unread": {
+          "type": "boolean"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -2588,6 +2685,17 @@
         }
       }
     },
+    "pbLeaveMessageRequest": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
     "pbListCategoriesResponse": {
       "type": "object",
       "properties": {
@@ -2629,6 +2737,21 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/pbUserInfo"
+          }
+        }
+      }
+    },
+    "pbListMessagesResponse": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "string",
+          "format": "int64"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListMessagesResponseMessageItem"
           }
         }
       }

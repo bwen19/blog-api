@@ -55,10 +55,16 @@ type BlogClient interface {
 	GetUserProfile(ctx context.Context, in *GetUserProfileRequest, opts ...grpc.CallOption) (*GetUserProfileResponse, error)
 	// MarkAllRead
 	MarkAllRead(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// LeaveMessage
+	LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// DeleteNotifs
 	DeleteNotifs(ctx context.Context, in *DeleteNotifsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListNotifs
 	ListNotifs(ctx context.Context, in *ListNotifsRequest, opts ...grpc.CallOption) (*ListNotifsResponse, error)
+	// ListMessages
+	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
+	// CheckMessages
+	CheckMessages(ctx context.Context, in *CheckMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// FollowUser
 	FollowUser(ctx context.Context, in *FollowUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListFollows
@@ -271,6 +277,15 @@ func (c *blogClient) MarkAllRead(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
+func (c *blogClient) LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/pb.Blog/LeaveMessage", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *blogClient) DeleteNotifs(ctx context.Context, in *DeleteNotifsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/pb.Blog/DeleteNotifs", in, out, opts...)
@@ -283,6 +298,24 @@ func (c *blogClient) DeleteNotifs(ctx context.Context, in *DeleteNotifsRequest, 
 func (c *blogClient) ListNotifs(ctx context.Context, in *ListNotifsRequest, opts ...grpc.CallOption) (*ListNotifsResponse, error) {
 	out := new(ListNotifsResponse)
 	err := c.cc.Invoke(ctx, "/pb.Blog/ListNotifs", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogClient) ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error) {
+	out := new(ListMessagesResponse)
+	err := c.cc.Invoke(ctx, "/pb.Blog/ListMessages", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogClient) CheckMessages(ctx context.Context, in *CheckMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/pb.Blog/CheckMessages", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -586,10 +619,16 @@ type BlogServer interface {
 	GetUserProfile(context.Context, *GetUserProfileRequest) (*GetUserProfileResponse, error)
 	// MarkAllRead
 	MarkAllRead(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// LeaveMessage
+	LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error)
 	// DeleteNotifs
 	DeleteNotifs(context.Context, *DeleteNotifsRequest) (*emptypb.Empty, error)
 	// ListNotifs
 	ListNotifs(context.Context, *ListNotifsRequest) (*ListNotifsResponse, error)
+	// ListMessages
+	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
+	// CheckMessages
+	CheckMessages(context.Context, *CheckMessagesRequest) (*emptypb.Empty, error)
 	// FollowUser
 	FollowUser(context.Context, *FollowUserRequest) (*emptypb.Empty, error)
 	// ListFollows
@@ -703,11 +742,20 @@ func (UnimplementedBlogServer) GetUserProfile(context.Context, *GetUserProfileRe
 func (UnimplementedBlogServer) MarkAllRead(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkAllRead not implemented")
 }
+func (UnimplementedBlogServer) LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LeaveMessage not implemented")
+}
 func (UnimplementedBlogServer) DeleteNotifs(context.Context, *DeleteNotifsRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNotifs not implemented")
 }
 func (UnimplementedBlogServer) ListNotifs(context.Context, *ListNotifsRequest) (*ListNotifsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListNotifs not implemented")
+}
+func (UnimplementedBlogServer) ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMessages not implemented")
+}
+func (UnimplementedBlogServer) CheckMessages(context.Context, *CheckMessagesRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckMessages not implemented")
 }
 func (UnimplementedBlogServer) FollowUser(context.Context, *FollowUserRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FollowUser not implemented")
@@ -1097,6 +1145,24 @@ func _Blog_MarkAllRead_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Blog_LeaveMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).LeaveMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/LeaveMessage",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).LeaveMessage(ctx, req.(*LeaveMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Blog_DeleteNotifs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteNotifsRequest)
 	if err := dec(in); err != nil {
@@ -1129,6 +1195,42 @@ func _Blog_ListNotifs_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BlogServer).ListNotifs(ctx, req.(*ListNotifsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Blog_ListMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).ListMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/ListMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).ListMessages(ctx, req.(*ListMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Blog_CheckMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).CheckMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/CheckMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).CheckMessages(ctx, req.(*CheckMessagesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1727,12 +1829,24 @@ var Blog_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Blog_MarkAllRead_Handler,
 		},
 		{
+			MethodName: "LeaveMessage",
+			Handler:    _Blog_LeaveMessage_Handler,
+		},
+		{
 			MethodName: "DeleteNotifs",
 			Handler:    _Blog_DeleteNotifs_Handler,
 		},
 		{
 			MethodName: "ListNotifs",
 			Handler:    _Blog_ListNotifs_Handler,
+		},
+		{
+			MethodName: "ListMessages",
+			Handler:    _Blog_ListMessages_Handler,
+		},
+		{
+			MethodName: "CheckMessages",
+			Handler:    _Blog_CheckMessages_Handler,
 		},
 		{
 			MethodName: "FollowUser",
