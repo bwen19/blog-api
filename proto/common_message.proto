@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "blog/server/pb";
+
+message RefreshInfo {
+    bool refreshable = 1;
+}
+
+message User {
+    int64 id = 1;
+    string username = 2;
+    string email = 3;
+    string avatar = 4;
+    string info = 5;
+    string role = 6;
+}
+
+message UserInfo {
+    int64 id = 1;
+    string username = 2;
+    string avatar = 3;
+    string info = 4;
+    int64 follower_count = 5;
+    int64 following_count = 6;
+    bool is_followed = 7;
+}
+
+message Category {
+    int64 id = 1;
+    string name = 2;
+}
+
+message Tag {
+    int64 id = 1;
+    string name = 2;
+}
+
+message Comment {
+    int64 id = 1;
+    UserInfo user = 2;
+    string content = 3;
+    int64 star_count = 4;
+    int64 reply_count = 5;
+    repeated CommentReply replies = 6;
+    google.protobuf.Timestamp create_at = 7;
+}
+
+message CommentReply {
+    int64 id = 1;
+    UserInfo reply_user = 2;
+    UserInfo user = 3;
+    string content = 4;
+    int64 star_count = 5;
+    google.protobuf.Timestamp create_at = 6;
+}

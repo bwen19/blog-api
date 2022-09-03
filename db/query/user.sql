@@ -1,45 +1,86 @@
 -- name: CreateUser :one
 INSERT INTO users (
-    username,
-    hashed_password,
-    email,
-    avatar_src
+  username, email, hashed_password, avatar, role
 ) VALUES (
-    $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 ) RETURNING *;
 
--- name: DeleteUser :exec
-DELETE FROM users WHERE username = $1;
-
--- name: GetUser :one
-SELECT * FROM users
-WHERE username = $1
-  OR email = $2
-LIMIT 1;
-
--- name: ListUsers :many
-SELECT * FROM users
-ORDER BY username
-LIMIT $1
-OFFSET $2;
+-- name: DeleteUsers :execrows
+DELETE FROM users WHERE id = ANY(@ids::bigint[]);
 
 -- name: UpdateUser :one
 UPDATE users
 SET
-  username = CASE WHEN @set_new_name::bool
-    THEN @new_name::varchar
-    ELSE username END,
-  hashed_password = CASE WHEN @set_hashed_password::bool
-    THEN @hashed_password::varchar
-    ELSE hashed_password END,
-  email = CASE WHEN @set_email::bool
-    THEN @email::varchar
-    ELSE email END,
-  role = CASE WHEN @set_role::bool
-    THEN @role::varchar
-    ELSE role END,
-  avatar_src = CASE WHEN @set_avatar_src::bool
-    THEN @avatar_src::varchar
-    ELSE avatar_src END
-WHERE username = $1
+  username = coalesce(sqlc.narg('username'), username),
+  email = coalesce(sqlc.narg('email'), email),
+  hashed_password = coalesce(sqlc.narg('hashed_password'), hashed_password),
+  avatar = coalesce(sqlc.narg('avatar'), avatar),
+  info = coalesce(sqlc.narg('info'), info),
+  role = coalesce(sqlc.narg('role'), role),
+  is_deleted = coalesce(sqlc.narg('is_deleted'), is_deleted)
+WHERE id = $1
 RETURNING *;
+
+-- name: ListUsers :many
+WITH Data_CTE AS (
+  SELECT id, username, email, avatar, role, is_deleted, create_at
+  FROM users
+  WHERE @any_keyword::bool
+    OR username LIKE @keyword::varchar
+    OR email LIKE @keyword::varchar
+),
+Count_CTE AS (
+  SELECT count(*) total FROM Data_CTE
+)
+SELECT dc.*, cc.total, (
+    SELECT count(*) FROM posts WHERE posts.author_id = dc.id
+  ) post_count
+FROM Data_CTE dc
+CROSS JOIN Count_CTE cc
+ORDER BY
+  CASE WHEN @username_asc::bool THEN username END ASC,
+  CASE WHEN @username_desc::bool THEN username END DESC,
+  CASE WHEN @role_asc::bool THEN role END ASC,
+  CASE WHEN @role_desc::bool THEN role END DESC,
+  CASE WHEN @deleted_asc::bool THEN is_deleted END ASC,
+  CASE WHEN @deleted_desc::bool THEN is_deleted END DESC,
+  CASE WHEN @create_at_asc::bool THEN create_at END ASC,
+  CASE WHEN @create_at_desc::bool THEN create_at END DESC
+LIMIT $1
+OFFSET $2;
+
+-- name: GetUserProfile :one
+WITH SUM_CTE AS (
+  SELECT coalesce(sum(view_count), 0)::bigint view_count,
+    coalesce(sum(star_count), 0)::bigint star_count
+  FROM (
+    SELECT p.id, p.view_count, count(ps.user_id) star_count
+    FROM posts p
+    LEFT JOIN post_stars ps ON ps.post_id = p.id
+    WHERE p.author_id = @user_id::bigint
+    GROUP BY p.id, p.view_count
+  ) pc
+)
+SELECT u.id, u.username, u.avatar, u.info, sc.view_count,
+  sc.star_count, fu.follower_id followed,
+  (SELECT count(*) FROM follows f
+    WHERE f.user_id = @user_id::bigint) follower_count,
+  (SELECT count(*) FROM follows f
+    WHERE f.follower_id = @user_id::bigint) following_count
+FROM users u
+CROSS JOIN SUM_CTE sc
+LEFT JOIN follows fu
+  ON fu.user_id = u.id AND fu.follower_id = @self_id::bigint
+WHERE u.id = @user_id::bigint LIMIT 1;
+
+-- name: GetUser :one
+SELECT * FROM users
+WHERE id = $1 LIMIT 1;
+
+-- name: GetUserByUsername :one
+SELECT * FROM users
+WHERE username = $1 LIMIT 1;
+
+-- name: GetUserByEmail :one
+SELECT * FROM users
+WHERE email = $1 LIMIT 1;

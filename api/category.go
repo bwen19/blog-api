@@ -1,155 +1,160 @@
 package api
 
 import (
-	db "blog/server/db/sqlc"
-	"database/sql"
-	"fmt"
-	"net/http"
+	"blog/server/db/sqlc"
+	"blog/server/pb"
+	"blog/server/util"
+	"context"
 
-	"github.com/gin-gonic/gin"
-	"github.com/lib/pq"
+	"github.com/jackc/pgconn"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// =============================================================
-// createCategory
-type createCategoryRequest struct {
-	Name string `json:"name" binding:"required"`
-}
-
-// @Router /api/admin/categories [post]
-func (server *Server) createCategory(ctx *gin.Context) {
-	var req createCategoryRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+// -------------------------------------------------------------------
+// CreateCategory
+func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategoryRequest) (*pb.CreateCategoryResponse, error) {
+	name := req.GetName()
+	if err := util.ValidateString(name, 1, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
 	}
 
-	category, err := server.store.CreateCategory(ctx, req.Name)
+	category, err := server.store.CreateCategory(ctx, name)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			switch pgErr.ConstraintName {
+			case "categories_name_key":
+				return nil, status.Errorf(codes.AlreadyExists, "category name already exists: %s", req.GetName())
 			}
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, status.Error(codes.Internal, "failed to create category")
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"category": category})
+	rsp := &pb.CreateCategoryResponse{Category: convertCategory(category)}
+	return rsp, nil
 }
 
-// =============================================================
-// getCategory
-type getCategoryRequest struct {
-	Name string `uri:"name" binding:"required"`
-}
-
-// @Router /api/admin/categories/:name [get]
-func (server *Server) getCategory(ctx *gin.Context) {
-	var req getCategoryRequest
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	category, err := server.store.GetCategory(ctx, req.Name)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, errorResponse(err))
-			return
+// -------------------------------------------------------------------
+// DeleteCategories
+func (server *Server) DeleteCategories(ctx context.Context, req *pb.DeleteCategoriesRequest) (*emptypb.Empty, error) {
+	categoryIDs := util.RemoveDuplicates(req.GetCategoryIds())
+	for _, categoryID := range categoryIDs {
+		if err := util.ValidateID(categoryID); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"category": category})
+	nrows, err := server.store.DeleteCategories(ctx, categoryIDs)
+	if err != nil || int64(len(categoryIDs)) != nrows {
+		return nil, status.Error(codes.Internal, "failed to delete categories")
+	}
+	return &emptypb.Empty{}, nil
 }
 
-// =============================================================
-// listCategories
-// @Router /api/admin/categories [get]
-func (server *Server) listCategories(ctx *gin.Context) {
-	categories, err := server.store.ListCategories(ctx)
+// -------------------------------------------------------------------
+// UpdateCategory
+func (server *Server) UpdateCategory(ctx context.Context, req *pb.UpdateCategoryRequest) (*pb.UpdateCategoryResponse, error) {
+	arg, err := parseUpdateCategoryRequest(req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, err
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"categories": categories})
-}
-
-// =============================================================
-// updateCategory
-type updateCategoryUriRequest struct {
-	Name string `uri:"name" binding:"required"`
-}
-
-type updateCategoryRequest struct {
-	NewName string `json:"new_name" binding:"required"`
-}
-
-// @Router /api/admin/categories/:name [patch]
-func (server *Server) updateCategory(ctx *gin.Context) {
-	var req1 updateCategoryUriRequest
-	if err := ctx.ShouldBindUri(&req1); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	var req2 updateCategoryRequest
-	if err := ctx.ShouldBindJSON(&req2); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	if req1.Name == req2.NewName {
-		err := fmt.Errorf("no need to update")
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
-	}
-
-	arg := db.UpdateCategoryParams{
-		Name:    req1.Name,
-		NewName: req2.NewName,
-	}
-
-	category, err := server.store.UpdateCategory(ctx, arg)
+	newCategory, err := server.store.UpdateCategory(ctx, *arg)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			switch pgErr.ConstraintName {
+			case "categories_name_key":
+				return nil, status.Errorf(codes.AlreadyExists, "category name already exists: %s", arg.Name)
 			}
 		}
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, status.Error(codes.Internal, "failed to update category")
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"category": category})
+	rsp := &pb.UpdateCategoryResponse{Category: convertCategory(newCategory)}
+	return rsp, nil
 }
 
-// =============================================================
-// deleteCategory
-type deleteCategoryRequest struct {
-	Name string `uri:"name" binding:"required"`
-}
-
-// @Router /api/admin/categories/:name [delete]
-func (server *Server) deleteCategory(ctx *gin.Context) {
-	var req deleteCategoryRequest
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+func parseUpdateCategoryRequest(req *pb.UpdateCategoryRequest) (*sqlc.UpdateCategoryParams, error) {
+	categoryID := req.GetCategoryId()
+	if err := util.ValidateID(categoryID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
 	}
 
-	err := server.store.DeleteCategory(ctx, req.Name)
+	name := req.GetName()
+	if err := util.ValidateString(name, 1, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
+	}
+
+	arg := &sqlc.UpdateCategoryParams{
+		ID:   categoryID,
+		Name: name,
+	}
+	return arg, nil
+}
+
+// -------------------------------------------------------------------
+// ListCategories
+func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategoriesRequest) (*pb.ListCategoriesResponse, error) {
+	arg, err := parseListCategoriesRequest(req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, err
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"category": req.Name})
+	categories, err := server.store.ListCategories(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list categories")
+	}
+
+	rsp := convertListCategories(categories)
+	return rsp, nil
+}
+
+func parseListCategoriesRequest(req *pb.ListCategoriesRequest) (*sqlc.ListCategoriesParams, error) {
+	options := []string{"name", ""}
+	err := util.ValidateOrder(req, options)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	params := &sqlc.ListCategoriesParams{
+		NameAsc:  req.GetOrderBy() == "name" && req.GetOrder() == "asc",
+		NameDesc: req.GetOrderBy() == "name" && req.GetOrder() == "desc",
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// GetCategories
+func (server *Server) GetCategories(ctx context.Context, req *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
+	categories, err := server.store.GetCategories(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get categories")
+	}
+
+	rsp := &pb.GetCategoriesResponse{
+		Categories: convertCategories(categories),
+	}
+	return rsp, nil
+}
+
+// -------------------------------------------------------------------
+// Utils for post-category
+
+// setPostCategories
+func (server *Server) setPostCategories(ctx context.Context, postID int64, categoryIDs []int64) ([]sqlc.Category, error) {
+	arg := sqlc.SetPostCategoriesParams{
+		PostID:      postID,
+		CategoryIds: categoryIDs,
+	}
+	categories, err := server.store.SetPostCategories(ctx, arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to set post categories")
+	}
+
+	res := []sqlc.Category{}
+	for _, category := range categories {
+		res = append(res, sqlc.Category(category))
+	}
+	return res, nil
 }

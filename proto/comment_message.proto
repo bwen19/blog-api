@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+import "common_message.proto";
+
+option go_package = "blog/server/pb";
+
+message CreateCommentRequest {
+    int64 post_id = 1;
+    int64 parent_id = 2;
+    int64 reply_user_id = 3;
+    string content = 4;
+}
+message CreateCommentResponse {
+    int64 id = 1;
+    int64 parent_id = 2;
+    UserInfo reply_user = 3;
+    UserInfo user = 4;
+    string content = 5;
+    google.protobuf.Timestamp create_at = 6;
+}
+
+message DeleteCommentRequest {
+    int64 comment_id = 1;
+}
+
+message ListCommentsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string orderBy = 4;
+    int64 post_id = 5;
+}
+message ListCommentsResponse {
+    int64 total = 1;
+    int64 comment_count = 2;
+    repeated Comment comments = 3;
+}
+
+message ListRepliesRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string orderBy = 4;
+    int64 comment_id =5;
+}
+message ListRepliesResponse {
+    int64 total = 1;
+    repeated CommentReply comment_replies = 2;
+}
+
+message StarCommentRequest {
+    int64 comment_id = 1;
+    bool isLike = 2;
+}

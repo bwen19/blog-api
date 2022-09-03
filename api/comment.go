@@ -1,163 +1,230 @@
 package api
 
 import (
-	db "blog/server/db/sqlc"
-	"net/http"
-	"time"
+	"blog/server/db/sqlc"
+	"blog/server/pb"
+	"blog/server/util"
+	"context"
+	"database/sql"
+	"log"
 
-	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type commentList = db.ListCommentsByArticleRow
-
-type commentResponse struct {
-	ID        int64     `json:"id"`
-	ParentID  int64     `json:"parent_id"`
-	ArticleID int64     `json:"article_id"`
-	Commenter string    `json:"commenter"`
-	AvatarSrc string    `json:"avatar_src"`
-	Content   string    `json:"content"`
-	CommentAt time.Time `json:"comment_at"`
-}
-
-func newCommentResponse1(comment *db.Comment, commenter *db.User) commentResponse {
-	return commentResponse{
-		ID:        comment.ID,
-		ParentID:  comment.ParentID.Int64,
-		ArticleID: comment.ArticleID,
-		Commenter: commenter.Username,
-		AvatarSrc: commenter.AvatarSrc,
-		Content:   comment.Content,
-		CommentAt: comment.CommentAt,
-	}
-}
-
-func newCommentResponse2(comment *commentList) commentResponse {
-	return commentResponse{
-		ID:        comment.ID,
-		ParentID:  comment.ParentID.Int64,
-		ArticleID: comment.ArticleID,
-		Commenter: comment.Commenter,
-		AvatarSrc: comment.AvatarSrc,
-		Content:   comment.Content,
-		CommentAt: comment.CommentAt,
-	}
-}
-
-// =============================================================
-// listComments
-type listCommentsRequest struct {
-	PageID    int32 `form:"page_id" binding:"required,min=1"`
-	PageSize  int32 `form:"page_size" binding:"required,min=5,max=20"`
-	ArticleID int64 `form:"article_id" binding:"required,min=1"`
-}
-
-// @Router /api/comments [get]
-func (server *Server) listArticleComments(ctx *gin.Context) {
-	var req listCommentsRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+// -------------------------------------------------------------------
+// CreateComment
+func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRequest) (*pb.CreateCommentResponse, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg := db.ListCommentsByArticleParams{
-		Limit:     req.PageSize,
-		Offset:    (req.PageID - 1) * req.PageSize,
-		ArticleID: req.ArticleID,
-	}
-
-	comments, err := server.store.ListCommentsByArticle(ctx, arg)
+	arg1, err := parseCreateCommentRequest(authUser, req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, err
 	}
 
-	var rsp []commentResponse
-	var commentIDs []int64
-	for _, comment := range comments {
-		commentIDs = append(commentIDs, comment.ID)
-		rsp = append(rsp, newCommentResponse2(&comment))
-	}
-
-	childComments, err := server.store.ListChildComments(ctx, commentIDs)
+	comment, err := server.store.CreateComment(ctx, *arg1)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-	for _, comment := range childComments {
-		cm := commentList(comment)
-		rsp = append(rsp, newCommentResponse2(&cm))
+		return nil, status.Error(codes.Internal, "failed to create comment")
 	}
 
-	ctx.JSON(http.StatusOK, rsp)
-}
-
-// =============================================================
-// createComment
-type createCommentRequest struct {
-	ParentID  int64  `json:"parent_id" binding:"omitempty,min=1"`
-	ArticleID int64  `json:"article_id" binding:"required,min=1"`
-	Content   string `json:"content" binding:"required,min=1"`
-}
-
-// @Router /api/user/comments [post]
-func (server *Server) createComment(ctx *gin.Context) {
-	var req createCommentRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+	userID := comment.AuthorID
+	if comment.ReplyUserID.Valid {
+		userID = comment.ReplyUserID.Int64
+	}
+	arg2 := sqlc.CreateNotificationParams{
+		UserID:  userID,
+		Kind:    "reply",
+		Title:   "New Comment at You",
+		Content: comment.Content,
 	}
 
-	authUser := ctx.MustGet(authorizationUserKey).(*db.User)
-
-	arg := db.CreateCommentParams{
-		ArticleID: req.ArticleID,
-		Commenter: authUser.Username,
-		Content:   req.Content,
-	}
-	if req.ParentID > 0 {
-		arg.SetParentID = true
-		arg.ParentID = req.ParentID
-	}
-
-	comment, err := server.store.CreateComment(ctx, arg)
+	err = server.store.CreateNotification(ctx, arg2)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		log.Println("failed to create new notification for withdrawing post")
 	}
 
-	rsp := newCommentResponse1(&comment, authUser)
-	ctx.JSON(http.StatusOK, rsp)
+	rsp := convertCreateComment(comment, authUser.User)
+	return rsp, nil
 }
 
-// =============================================================
-// deleteComment
-type deleteCommentRequest struct {
-	ID int64 `uri:"id" binding:"required,min=1"`
+func parseCreateCommentRequest(user AuthUser, req *pb.CreateCommentRequest) (*sqlc.CreateCommentParams, error) {
+	postID := req.GetPostId()
+	if err := util.ValidateID(postID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
+	parentID := req.GetParentId()
+	replyUserID := req.GetReplyUserId()
+
+	content := req.GetContent()
+	if err := util.ValidateString(content, 1, 500); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "content: %s", err.Error())
+	}
+
+	params := &sqlc.CreateCommentParams{
+		PostID:      postID,
+		UserID:      user.ID,
+		ParentID:    sql.NullInt64{Int64: parentID, Valid: parentID > 0},
+		ReplyUserID: sql.NullInt64{Int64: replyUserID, Valid: replyUserID > 0},
+		Content:     content,
+	}
+	return params, nil
 }
 
-// @Router /api/user/comments/:id [delete]
-func (server *Server) deleteComment(ctx *gin.Context) {
-	var req deleteCommentRequest
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return
+// -------------------------------------------------------------------
+// DeleteComment
+func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	authUser := ctx.MustGet(authorizationUserKey).(*db.User)
-
-	arg := db.DeleteCommentParams{ID: req.ID}
-	if authUser.Role == "admin" {
-		arg.AnyCommenter = true
-	} else {
-		arg.Commenter = authUser.Username
+	commentID := req.GetCommentId()
+	if err := util.ValidateID(commentID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
 	}
 
+	arg := sqlc.DeleteCommentParams{
+		ID:      commentID,
+		IsAdmin: authUser.Role == "admin",
+		UserID:  authUser.ID,
+	}
 	err := server.store.DeleteComment(ctx, arg)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
+		return nil, status.Error(codes.Internal, "failed to delete comment")
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// -------------------------------------------------------------------
+// ListComments
+func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequest) (*pb.ListCommentsResponse, error) {
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"id": req.ID})
+	arg, err := parseListCommentsRequest(authUser, req)
+	if err != nil {
+		return nil, err
+	}
+
+	comments, err := server.store.ListComments(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get comment list")
+	}
+
+	rsp := convertListComments(comments)
+	return rsp, nil
+}
+
+func parseListCommentsRequest(user AuthUser, req *pb.ListCommentsRequest) (*sqlc.ListCommentsParams, error) {
+	options := []string{"createAt", "starCount"}
+	err := util.ValidatePageOrder(req, options)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	postID := req.GetPostId()
+	if err := util.ValidateID(postID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
+	params := &sqlc.ListCommentsParams{
+		Limit:         req.GetPageSize(),
+		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
+		PostID:        postID,
+		SelfID:        user.ID,
+		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
+		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
+		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
+		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// ListReplies
+func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesRequest) (*pb.ListRepliesResponse, error) {
+	var authUser AuthUser
+	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
+		authUser = user
+	}
+
+	arg, err := parseListRepliesRequest(authUser, req)
+	if err != nil {
+		return nil, err
+	}
+
+	replies, err := server.store.ListReplies(ctx, *arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get comment list")
+	}
+
+	rsp := convertListReplies(replies)
+	return rsp, nil
+}
+
+func parseListRepliesRequest(user AuthUser, req *pb.ListRepliesRequest) (*sqlc.ListRepliesParams, error) {
+	options := []string{"createAt", "starCount"}
+	err := util.ValidatePageOrder(req, options)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	commentID := req.GetCommentId()
+	if err := util.ValidateID(commentID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
+	params := &sqlc.ListRepliesParams{
+		Limit:         req.GetPageSize(),
+		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
+		ParentID:      commentID,
+		SelfID:        user.ID,
+		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
+		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
+		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
+		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
+	}
+	return params, nil
+}
+
+// -------------------------------------------------------------------
+// StarComment
+func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	commentID := req.GetCommentId()
+	if err := util.ValidateID(commentID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
+	}
+
+	if req.GetIsLike() {
+		arg := sqlc.CreateCommentStarParams{
+			CommentID: commentID,
+			UserID:    authUser.ID,
+		}
+		err := server.store.CreateCommentStar(ctx, arg)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to create comment star")
+		}
+	} else {
+		arg := sqlc.DeleteCommentStarParams{
+			CommentID: commentID,
+			UserID:    authUser.ID,
+		}
+		err := server.store.DeleteCommentStar(ctx, arg)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to delete comment star")
+		}
+	}
+	return &emptypb.Empty{}, nil
 }
