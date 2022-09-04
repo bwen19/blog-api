@@ -1,10 +1,14 @@
 DB_URL=postgresql://root:secret@localhost:5432/blog?sslmode=disable
+DOCKER_DB_URL=postgresql://root:secret@postgres:5432/blog?sslmode=disable
 
 network:
 	docker network create blog-network
 
 postgres:
 	docker run --name postgres --network blog-network -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:alpine
+
+blog:
+	docker run --name blog --network blog-network -p 8080:8080 -p 9090:9090 -e DB_SOURCE="${DOCKER_DB_URL}" blog:latest
 
 createdb:
 	docker exec -it postgres createdb --username=root --owner=root blog
@@ -22,7 +26,7 @@ migratedown:
 	migrate -path db/migration -database "$(DB_URL)" -verbose down
 
 sqlc:
-	cmd /C del db\sqlc\\*.sql.go
+	cmd /C del db\sqlc\\*.go
 	docker run --rm -v D:\project\webapp\blog\server:/src -w /src kjconroy/sqlc generate
 
 test:
@@ -46,4 +50,4 @@ proto:
 evans:
 	evans --host localhost --port 9090 -r repl
 
-.PHONY: network postgres createdb dropdb db_schema migrateup migratedown sqlc test server proto evans
+.PHONY: network postgres blog createdb dropdb db_schema migrateup migratedown sqlc test server proto evans
