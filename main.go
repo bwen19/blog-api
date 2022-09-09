@@ -86,6 +86,9 @@ func runGatewayServer(config util.Config, server *api.Server) {
 	defer cancel()
 
 	options := runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+		MarshalOptions: protojson.MarshalOptions{
+			EmitUnpopulated: true,
+		},
 		UnmarshalOptions: protojson.UnmarshalOptions{
 			DiscardUnknown: true,
 		},
