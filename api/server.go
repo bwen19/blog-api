@@ -1,10 +1,11 @@
 package api
 
 import (
-	"blog/server/db"
-	"blog/server/pb"
-	"blog/server/util"
 	"fmt"
+
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 )
 
 // Server serves gRPC requests for blog service
@@ -63,16 +64,15 @@ func allowedRoles() map[string][]string {
 		blogBasePath + "CreatePost":            {"admin", "author"},
 		blogBasePath + "DeletePosts":           {"admin", "author"},
 		blogBasePath + "UpdatePost":            {"admin", "author"},
-		blogBasePath + "ListPosts":             {"admin", "author"},
 		blogBasePath + "SubmitPost":            {"admin", "author"},
-		blogBasePath + "ReviewPost":            {"admin", "author"},
 		blogBasePath + "PublishPost":           {"admin"},
 		blogBasePath + "WithdrawPost":          {"admin"},
-		blogBasePath + "ChangePost":            {"admin"},
-		blogBasePath + "GetPosts":              {"admin"},
-		blogBasePath + "StarPost":              {"admin", "author", "user"},
-		blogBasePath + "FetchPosts":            {"any", "admin", "author", "user"},
+		blogBasePath + "UpdatePostLabel":       {"admin"},
+		blogBasePath + "ListPosts":             {"admin", "author"},
+		blogBasePath + "GetPost":               {"admin", "author"},
+		blogBasePath + "GetPosts":              {"any", "admin", "author", "user"},
 		blogBasePath + "ReadPost":              {"any", "admin", "author", "user"},
+		blogBasePath + "StarPost":              {"admin", "author", "user"},
 		blogBasePath + "CreateCategory":        {"admin"},
 		blogBasePath + "DeleteCategories":      {"admin"},
 		blogBasePath + "UpdateCategory":        {"admin"},
@@ -82,6 +82,7 @@ func allowedRoles() map[string][]string {
 		blogBasePath + "DeleteTags":            {"admin"},
 		blogBasePath + "UpdateTag":             {"admin"},
 		blogBasePath + "ListTags":              {"admin"},
+		blogBasePath + "GetTag":                {"admin", "author"},
 		blogBasePath + "CreateComment":         {"admin", "author", "user"},
 		blogBasePath + "DeleteComment":         {"admin", "author", "user"},
 		blogBasePath + "ListComments":          {"any", "admin", "author", "user"},

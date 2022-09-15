@@ -58,6 +58,25 @@ func ValidateOneOf(value string, list []string) error {
 	return fmt.Errorf("must be one of values: %s", list)
 }
 
+func ValidateRepeatedIDs(IDs []int64) ([]int64, error) {
+	dict := map[int64]byte{}
+
+	result := []int64{}
+	for _, ID := range IDs {
+		if _, ok := dict[ID]; ok {
+			continue
+		}
+		dict[ID] = 0
+
+		if err := ValidateID(ID); err != nil {
+			return nil, err
+		}
+		result = append(result, ID)
+	}
+
+	return result, nil
+}
+
 // -------------------------------------------------------------------
 
 type Page interface {

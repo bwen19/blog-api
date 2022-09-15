@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package pb;
+
+import "common_message.proto";
+
+option go_package = "github.com/bwen19/blog/grpc/pb";
+
+message RegisterRequest {
+    string username = 1;
+    string email = 2;
+    string password = 3;
+}
+message RegisterResponse {
+    User user = 1;
+}
+
+message LoginRequest {
+    oneof payload {
+        string username = 1;
+        string email = 2;
+    }
+    string password = 3;
+}
+message LoginResponse {
+    User user = 1;
+    string access_token = 2;
+    string refresh_token = 3;
+    int64 unread_count = 4;
+}
+
+message AutoLoginRequest {
+    string refresh_token = 1;
+}
+message AutoLoginResponse {
+    User user = 1;
+    string access_token = 2;
+    int64 unread_count = 3;
+}
+
+message RefreshTokenRequest {
+    string refresh_token = 1;
+}
+message RefreshTokenResponse {
+    string access_token = 1;
+}
+
+message LogoutRequest {
+    string refresh_token = 1;
+}

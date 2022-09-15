@@ -1,24 +1,23 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func convertUser(user sqlc.User) *pb.User {
+func convertUser(user db.User) *pb.User {
 	return &pb.User{
 		Id:       user.ID,
 		Username: user.Username,
 		Email:    user.Email,
 		Avatar:   user.Avatar,
-		Info:     user.Info,
+		Intro:    user.Intro,
 		Role:     user.Role,
 	}
 }
 
-func convertListUsers(users []sqlc.ListUsersRow) *pb.ListUsersResponse {
+func convertListUsers(users []db.ListUsersRow) *pb.ListUsersResponse {
 	if len(users) == 0 {
 		return &pb.ListUsersResponse{}
 	}
@@ -31,7 +30,7 @@ func convertListUsers(users []sqlc.ListUsersRow) *pb.ListUsersResponse {
 			Email:     user.Email,
 			Avatar:    user.Avatar,
 			Role:      user.Role,
-			IsDeleted: user.IsDeleted,
+			Deleted:   user.Deleted,
 			PostCount: user.PostCount,
 			CreateAt:  timestamppb.New(user.CreateAt),
 		}
@@ -44,7 +43,7 @@ func convertListUsers(users []sqlc.ListUsersRow) *pb.ListUsersResponse {
 	}
 }
 
-func convertListSessions(sessions []sqlc.ListSessionsRow) *pb.ListSessionsResponse {
+func convertListSessions(sessions []db.ListSessionsRow) *pb.ListSessionsResponse {
 	if len(sessions) == 0 {
 		return &pb.ListSessionsResponse{}
 	}
@@ -67,7 +66,7 @@ func convertListSessions(sessions []sqlc.ListSessionsRow) *pb.ListSessionsRespon
 	}
 }
 
-func convertListNotifs(notifs []sqlc.ListNotificationsRow) *pb.ListNotifsResponse {
+func convertListNotifs(notifs []db.ListNotificationsRow) *pb.ListNotifsResponse {
 	if len(notifs) == 0 {
 		return &pb.ListNotifsResponse{}
 	}
@@ -92,7 +91,7 @@ func convertListNotifs(notifs []sqlc.ListNotificationsRow) *pb.ListNotifsRespons
 	}
 }
 
-func convertLisMessages(messages []sqlc.ListMessagesRow) *pb.ListMessagesResponse {
+func convertLisMessages(messages []db.ListMessagesRow) *pb.ListMessagesResponse {
 	if len(messages) == 0 {
 		return &pb.ListMessagesResponse{}
 	}
@@ -123,7 +122,7 @@ func convertLisMessages(messages []sqlc.ListMessagesRow) *pb.ListMessagesRespons
 	}
 }
 
-func convertListFollowers(followers []sqlc.ListFollowersRow) *pb.ListFollowsResponse {
+func convertListFollowers(followers []db.ListFollowersRow) *pb.ListFollowsResponse {
 	if len(followers) == 0 {
 		return &pb.ListFollowsResponse{}
 	}
@@ -131,11 +130,11 @@ func convertListFollowers(followers []sqlc.ListFollowersRow) *pb.ListFollowsResp
 	rspUsers := make([]*pb.UserInfo, 0, 5)
 	for _, follower := range followers {
 		pbUserInfo := &pb.UserInfo{
-			Id:         follower.UserID,
-			Username:   follower.Username,
-			Avatar:     follower.Avatar,
-			Info:       follower.Info,
-			IsFollowed: follower.Followed.Valid,
+			Id:       follower.UserID,
+			Username: follower.Username,
+			Avatar:   follower.Avatar,
+			Intro:    follower.Intro,
+			Followed: follower.Followed.Valid,
 		}
 		rspUsers = append(rspUsers, pbUserInfo)
 	}
@@ -146,7 +145,7 @@ func convertListFollowers(followers []sqlc.ListFollowersRow) *pb.ListFollowsResp
 	}
 }
 
-func convertListFollowings(followings []sqlc.ListFollowingsRow) *pb.ListFollowsResponse {
+func convertListFollowings(followings []db.ListFollowingsRow) *pb.ListFollowsResponse {
 	if len(followings) == 0 {
 		return &pb.ListFollowsResponse{}
 	}
@@ -154,11 +153,11 @@ func convertListFollowings(followings []sqlc.ListFollowingsRow) *pb.ListFollowsR
 	rspUsers := make([]*pb.UserInfo, 0, 5)
 	for _, follower := range followings {
 		pbUserInfo := &pb.UserInfo{
-			Id:         follower.UserID,
-			Username:   follower.Username,
-			Avatar:     follower.Avatar,
-			Info:       follower.Info,
-			IsFollowed: follower.Followed.Valid,
+			Id:       follower.UserID,
+			Username: follower.Username,
+			Avatar:   follower.Avatar,
+			Intro:    follower.Intro,
+			Followed: follower.Followed.Valid,
 		}
 		rspUsers = append(rspUsers, pbUserInfo)
 	}
@@ -169,14 +168,14 @@ func convertListFollowings(followings []sqlc.ListFollowingsRow) *pb.ListFollowsR
 	}
 }
 
-func convertCategory(category sqlc.Category) *pb.Category {
+func convertCategory(category db.Category) *pb.Category {
 	return &pb.Category{
 		Id:   category.ID,
 		Name: category.Name,
 	}
 }
 
-func convertCategories(categories []sqlc.Category) []*pb.Category {
+func convertCategories(categories []db.Category) []*pb.Category {
 	rsp := []*pb.Category{}
 	for _, category := range categories {
 		rsp = append(rsp, convertCategory(category))
@@ -184,7 +183,7 @@ func convertCategories(categories []sqlc.Category) []*pb.Category {
 	return rsp
 }
 
-func convertListCategories(categories []sqlc.ListCategoriesRow) *pb.ListCategoriesResponse {
+func convertListCategories(categories []db.ListCategoriesRow) *pb.ListCategoriesResponse {
 	rspCategories := []*pb.ListCategoriesResponse_CategoryItem{}
 	for _, category := range categories {
 		pbCategory := &pb.ListCategoriesResponse_CategoryItem{
@@ -199,14 +198,14 @@ func convertListCategories(categories []sqlc.ListCategoriesRow) *pb.ListCategori
 	}
 }
 
-func convertTag(tag sqlc.Tag) *pb.Tag {
+func convertTag(tag db.Tag) *pb.Tag {
 	return &pb.Tag{
 		Id:   tag.ID,
 		Name: tag.Name,
 	}
 }
 
-func convertTags(tags []sqlc.Tag) []*pb.Tag {
+func convertTags(tags []db.Tag) []*pb.Tag {
 	rsp := []*pb.Tag{}
 	for _, tag := range tags {
 		rsp = append(rsp, convertTag(tag))
@@ -214,7 +213,7 @@ func convertTags(tags []sqlc.Tag) []*pb.Tag {
 	return rsp
 }
 
-func convertListTags(tags []sqlc.ListTagsRow) *pb.ListTagsResponse {
+func convertListTags(tags []db.ListTagsRow) *pb.ListTagsResponse {
 	if len(tags) == 0 {
 		return &pb.ListTagsResponse{}
 	}
@@ -234,48 +233,37 @@ func convertListTags(tags []sqlc.ListTagsRow) *pb.ListTagsResponse {
 	}
 }
 
-func convertPost(post sqlc.Post, categories []sqlc.Category, tags []sqlc.Tag) *pb.Post {
+func convertNewPost(post db.CreateNewPostRow) *pb.Post {
 	return &pb.Post{
 		Id:         post.ID,
 		Title:      post.Title,
 		Abstract:   post.Abstract,
 		CoverImage: post.CoverImage,
 		Content:    post.Content,
-		Categories: convertCategories(categories),
-		Tags:       convertTags(tags),
-		IsFeatured: post.IsFeatured,
-		Status:     post.Status,
 	}
 }
 
-func convertListPosts(posts []sqlc.ListPostsRow) *pb.ListPostsResponse {
+func convertUpdatePost(post db.Post, content db.PostContent, categories []db.Category, tags []db.Tag) *pb.UpdatePostResponse {
+	pbPost := &pb.Post{
+		Id:         post.ID,
+		Title:      post.Title,
+		Abstract:   post.Abstract,
+		CoverImage: post.CoverImage,
+		Content:    content.Content,
+		Categories: convertCategories(categories),
+		Tags:       convertTags(tags),
+		Featured:   post.Featured,
+		Status:     post.Status,
+	}
+	return &pb.UpdatePostResponse{Post: pbPost}
+}
+
+func convertListPosts(posts []db.ListPostsRow) *pb.ListPostsResponse {
 	if len(posts) == 0 {
 		return &pb.ListPostsResponse{}
 	}
 
-	rspPosts := []*pb.ListPostsResponse_PostItem{}
-	for _, post := range posts {
-		pbPost := &pb.ListPostsResponse_PostItem{
-			Id:        post.ID,
-			Title:     post.Title,
-			Status:    post.Status,
-			UpdateAt:  timestamppb.New(post.UpdateAt),
-			PublishAt: timestamppb.New(post.PublishAt),
-		}
-		rspPosts = append(rspPosts, pbPost)
-	}
-	return &pb.ListPostsResponse{
-		Total: posts[0].Total,
-		Posts: rspPosts,
-	}
-}
-
-func convertGetPosts(posts []sqlc.GetPostsRow) *pb.GetPostsResponse {
-	if len(posts) == 0 {
-		return &pb.GetPostsResponse{}
-	}
-
-	rspPosts := []*pb.GetPostsResponse_PostItem{}
+	rspPosts := []*pb.PostItem{}
 	for _, post := range posts {
 		author := &pb.User{
 			Id:       post.AuthorID,
@@ -293,42 +281,6 @@ func convertGetPosts(posts []sqlc.GetPostsRow) *pb.GetPostsResponse {
 			categories = append(categories, category)
 		}
 
-		pbPost := &pb.GetPostsResponse_PostItem{
-			Id:         post.ID,
-			Title:      post.Title,
-			Author:     author,
-			ViewCount:  post.ViewCount,
-			Categories: categories,
-			Status:     post.Status,
-			IsFeatured: post.IsFeatured,
-			UpdateAt:   timestamppb.New(post.UpdateAt),
-			PublishAt:  timestamppb.New(post.PublishAt),
-		}
-		rspPosts = append(rspPosts, pbPost)
-	}
-	return &pb.GetPostsResponse{
-		Total: posts[0].Total,
-		Posts: rspPosts,
-	}
-}
-
-func convertFetchPosts(posts []sqlc.FetchPostsRow) *pb.FetchPostsResponse {
-	if len(posts) == 0 {
-		return &pb.FetchPostsResponse{}
-	}
-
-	rspPosts := []*pb.FetchPostsResponse_PostItem{}
-	for _, post := range posts {
-		author := &pb.UserInfo{
-			Id:             post.AuthorID,
-			Username:       post.Username,
-			Info:           post.Info,
-			Avatar:         post.Avatar,
-			FollowerCount:  post.FollowerCount,
-			FollowingCount: post.FollowingCount,
-			IsFollowed:     post.Followed.Valid,
-		}
-
 		tags := []*pb.Tag{}
 		for i := 0; i < len(post.TagIds); i++ {
 			tag := &pb.Tag{
@@ -338,27 +290,27 @@ func convertFetchPosts(posts []sqlc.FetchPostsRow) *pb.FetchPostsResponse {
 			tags = append(tags, tag)
 		}
 
-		pbPost := &pb.FetchPostsResponse_PostItem{
-			Id:           post.ID,
-			Title:        post.Title,
-			Author:       author,
-			Abstract:     post.Abstract,
-			CoverImage:   post.CoverImage,
-			Tags:         tags,
-			ViewCount:    post.ViewCount,
-			StarCount:    post.StarCount,
-			CommentCount: post.CommentCount,
-			PublishAt:    timestamppb.New(post.PublishAt),
+		pbPost := &pb.PostItem{
+			Id:         post.ID,
+			Title:      post.Title,
+			Author:     author,
+			Categories: categories,
+			Tags:       tags,
+			Status:     post.Status,
+			Featured:   post.Featured,
+			ViewCount:  post.ViewCount,
+			UpdateAt:   timestamppb.New(post.UpdateAt),
+			PublishAt:  timestamppb.New(post.PublishAt),
 		}
 		rspPosts = append(rspPosts, pbPost)
 	}
-	return &pb.FetchPostsResponse{
+	return &pb.ListPostsResponse{
 		Total: posts[0].Total,
 		Posts: rspPosts,
 	}
 }
 
-func convertReviewPost(post sqlc.ReviewPostRow) *pb.ReviewPostResponse {
+func convertGetPost(post db.GetPostRow) *pb.GetPostResponse {
 	tags := []*pb.Tag{}
 	for i := 0; i < len(post.TagIds); i++ {
 		tag := &pb.Tag{
@@ -385,31 +337,69 @@ func convertReviewPost(post sqlc.ReviewPostRow) *pb.ReviewPostResponse {
 		Content:    post.Content,
 		Categories: categories,
 		Tags:       tags,
-		IsFeatured: post.IsFeatured,
+		Featured:   post.Featured,
 		Status:     post.Status,
 	}
 
-	return &pb.ReviewPostResponse{Post: pbPost}
+	return &pb.GetPostResponse{Post: pbPost}
 }
 
-func convertReadPost(post sqlc.ReadPostRow) *pb.ReadPostResponse {
+func convertGetPosts(posts []db.GetPostsRow) *pb.GetPostsResponse {
+	if len(posts) == 0 {
+		return &pb.GetPostsResponse{}
+	}
+
+	rspPosts := []*pb.GetPostsResponse_PostItem{}
+	for _, post := range posts {
+		author := &pb.UserInfo{
+			Id:             post.AuthorID,
+			Username:       post.Username,
+			Intro:          post.Intro,
+			Avatar:         post.Avatar,
+			FollowerCount:  post.FollowerCount,
+			FollowingCount: post.FollowingCount,
+			Followed:       post.Followed.Valid,
+		}
+
+		tags := []*pb.Tag{}
+		for i := 0; i < len(post.TagIds); i++ {
+			tag := &pb.Tag{
+				Id:   post.TagIds[i],
+				Name: post.TagNames[i],
+			}
+			tags = append(tags, tag)
+		}
+
+		pbPost := &pb.GetPostsResponse_PostItem{
+			Id:           post.ID,
+			Title:        post.Title,
+			Author:       author,
+			Abstract:     post.Abstract,
+			CoverImage:   post.CoverImage,
+			Tags:         tags,
+			ViewCount:    post.ViewCount,
+			StarCount:    post.StarCount,
+			CommentCount: post.CommentCount,
+			PublishAt:    timestamppb.New(post.PublishAt),
+		}
+		rspPosts = append(rspPosts, pbPost)
+	}
+
+	return &pb.GetPostsResponse{
+		Total: posts[0].Total,
+		Posts: rspPosts,
+	}
+}
+
+func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 	author := &pb.UserInfo{
 		Id:             post.AuthorID,
 		Username:       post.Username,
 		Avatar:         post.Avatar,
-		Info:           post.Info,
+		Intro:          post.Intro,
 		FollowerCount:  post.FollowerCount,
 		FollowingCount: post.FollowingCount,
-		IsFollowed:     post.Followed.Valid,
-	}
-
-	tags := []*pb.Tag{}
-	for i := 0; i < len(post.TagIds); i++ {
-		tag := &pb.Tag{
-			Id:   post.TagIds[i],
-			Name: post.TagNames[i],
-		}
-		tags = append(tags, tag)
+		Followed:       post.Followed.Valid,
 	}
 
 	categories := []*pb.Category{}
@@ -421,11 +411,19 @@ func convertReadPost(post sqlc.ReadPostRow) *pb.ReadPostResponse {
 		categories = append(categories, category)
 	}
 
+	tags := []*pb.Tag{}
+	for i := 0; i < len(post.TagIds); i++ {
+		tag := &pb.Tag{
+			Id:   post.TagIds[i],
+			Name: post.TagNames[i],
+		}
+		tags = append(tags, tag)
+	}
+
 	pbPost := &pb.ReadPostResponse_Post{
 		Id:         post.ID,
 		Title:      post.Title,
 		Author:     author,
-		CoverImage: post.CoverImage,
 		Content:    post.Content,
 		Categories: categories,
 		Tags:       tags,
@@ -437,17 +435,17 @@ func convertReadPost(post sqlc.ReadPostRow) *pb.ReadPostResponse {
 	return &pb.ReadPostResponse{Post: pbPost}
 }
 
-func convertCreateComment(comment sqlc.CreateCommentRow, user sqlc.User) *pb.CreateCommentResponse {
+func convertCreateComment(comment db.CreateCommentRow, user db.User) *pb.CreateCommentResponse {
 	var replyUser *pb.UserInfo
 	if comment.ReplyUserID.Valid {
 		replyUser = &pb.UserInfo{
 			Id:             comment.ReplyUserID.Int64,
 			Username:       comment.RUsername.String,
 			Avatar:         comment.RAvatar.String,
-			Info:           comment.RInfo.String,
+			Intro:          comment.RIntro.String,
 			FollowerCount:  comment.RFollowerCount,
 			FollowingCount: comment.RFollowingCount,
-			IsFollowed:     comment.RFollowed.Valid,
+			Followed:       comment.RFollowed.Valid,
 		}
 	}
 
@@ -455,7 +453,7 @@ func convertCreateComment(comment sqlc.CreateCommentRow, user sqlc.User) *pb.Cre
 		Id:             user.ID,
 		Username:       user.Username,
 		Avatar:         user.Avatar,
-		Info:           user.Info,
+		Intro:          user.Intro,
 		FollowerCount:  comment.FollowerCount,
 		FollowingCount: comment.FollowingCount,
 	}
@@ -470,7 +468,7 @@ func convertCreateComment(comment sqlc.CreateCommentRow, user sqlc.User) *pb.Cre
 	}
 }
 
-func convertListComments(comments []sqlc.ListCommentsRow) *pb.ListCommentsResponse {
+func convertListComments(comments []db.ListCommentsRow) *pb.ListCommentsResponse {
 	if len(comments) == 0 {
 		return &pb.ListCommentsResponse{}
 	}
@@ -484,10 +482,10 @@ func convertListComments(comments []sqlc.ListCommentsRow) *pb.ListCommentsRespon
 			Id:             comment.UserID,
 			Username:       comment.Username,
 			Avatar:         comment.Avatar,
-			Info:           comment.Info,
+			Intro:          comment.Intro,
 			FollowerCount:  comment.FollowerCount,
 			FollowingCount: comment.FollowingCount,
-			IsFollowed:     comment.Followed.Valid,
+			Followed:       comment.Followed.Valid,
 		}
 		pbComment := &pb.Comment{
 			Id:         comment.ID,
@@ -515,19 +513,19 @@ func convertListComments(comments []sqlc.ListCommentsRow) *pb.ListCommentsRespon
 				Id:             comment.UserID,
 				Username:       comment.Username,
 				Avatar:         comment.Avatar,
-				Info:           comment.Info,
+				Intro:          comment.Intro,
 				FollowerCount:  comment.FollowerCount,
 				FollowingCount: comment.FollowingCount,
-				IsFollowed:     comment.Followed.Valid,
+				Followed:       comment.Followed.Valid,
 			}
 			replyUser := &pb.UserInfo{
 				Id:             comment.RUserID.Int64,
 				Username:       comment.RUsername.String,
 				Avatar:         comment.RAvatar.String,
-				Info:           comment.RInfo.String,
+				Intro:          comment.RIntro.String,
 				FollowerCount:  comment.RFollowerCount,
 				FollowingCount: comment.RFollowingCount,
-				IsFollowed:     comment.RFollowed.Valid,
+				Followed:       comment.RFollowed.Valid,
 			}
 			pbReply := &pb.CommentReply{
 				Id:        comment.ID,
@@ -548,7 +546,7 @@ func convertListComments(comments []sqlc.ListCommentsRow) *pb.ListCommentsRespon
 	}
 }
 
-func convertListReplies(replies []sqlc.ListRepliesRow) *pb.ListRepliesResponse {
+func convertListReplies(replies []db.ListRepliesRow) *pb.ListRepliesResponse {
 	if len(replies) == 0 {
 		return &pb.ListRepliesResponse{}
 	}
@@ -559,19 +557,19 @@ func convertListReplies(replies []sqlc.ListRepliesRow) *pb.ListRepliesResponse {
 			Id:             reply.UserID,
 			Username:       reply.Username,
 			Avatar:         reply.Avatar,
-			Info:           reply.Info,
+			Intro:          reply.Intro,
 			FollowerCount:  reply.FollowerCount,
 			FollowingCount: reply.FollowingCount,
-			IsFollowed:     reply.Followed.Valid,
+			Followed:       reply.Followed.Valid,
 		}
 		replyUser := &pb.UserInfo{
 			Id:             reply.RUserID.Int64,
 			Username:       reply.RUsername.String,
 			Avatar:         reply.RAvatar.String,
-			Info:           reply.RInfo.String,
+			Intro:          reply.RIntro.String,
 			FollowerCount:  reply.RFollowerCount,
 			FollowingCount: reply.RFollowingCount,
-			IsFollowed:     reply.RFollowed.Valid,
+			Followed:       reply.RFollowed.Valid,
 		}
 		pbReply := &pb.CommentReply{
 			Id:        reply.ID,

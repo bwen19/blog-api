@@ -1,11 +1,11 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,9 +20,14 @@ func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessions
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	sessionIDs := util.RemoveDuplicates(req.GetSessionIds())
+	dict := map[string]byte{}
 	ids := []uuid.UUID{}
-	for _, v := range sessionIDs {
+	for _, v := range req.GetSessionIds() {
+		if _, ok := dict[v]; ok {
+			continue
+		}
+		dict[v] = 0
+
 		sessionID, err := uuid.Parse(v)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "failed to parse session ID")
@@ -30,7 +35,7 @@ func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessions
 		ids = append(ids, sessionID)
 	}
 
-	arg := sqlc.DeleteSessionsParams{
+	arg := db.DeleteSessionsParams{
 		Ids:    ids,
 		UserID: authUser.ID,
 	}
@@ -55,33 +60,17 @@ func (server *Server) DeleteExpiredSessions(ctx context.Context, req *emptypb.Em
 // -------------------------------------------------------------------
 // ListSessions
 func (server *Server) ListSessions(ctx context.Context, req *pb.ListSessionsRequest) (*pb.ListSessionsResponse, error) {
+	options := []string{"clientIp", "createAt", "expiresAt"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg, err := parseListSessionsRequest(authUser, req)
-	if err != nil {
-		return nil, err
-	}
-
-	sessions, err := server.store.ListSessions(ctx, *arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get sessions")
-	}
-
-	rsp := convertListSessions(sessions)
-	return rsp, nil
-}
-
-func parseListSessionsRequest(user AuthUser, req *pb.ListSessionsRequest) (*sqlc.ListSessionsParams, error) {
-	options := []string{"clientIp", "createAt", "expiresAt"}
-	err := util.ValidatePageOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	params := &sqlc.ListSessionsParams{
+	arg := db.ListSessionsParams{
 		Limit:         req.GetPageSize(),
 		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
 		ClientIpAsc:   req.GetOrderBy() == "clientIp" && req.GetOrder() == "asc",
@@ -90,7 +79,14 @@ func parseListSessionsRequest(user AuthUser, req *pb.ListSessionsRequest) (*sqlc
 		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 		ExpiresAtAsc:  req.GetOrderBy() == "expiresAt" && req.GetOrder() == "asc",
 		ExpiresAtDesc: req.GetOrderBy() == "expiresAt" && req.GetOrder() == "desc",
-		UserID:        user.ID,
+		UserID:        authUser.ID,
 	}
-	return params, nil
+
+	sessions, err := server.store.ListSessions(ctx, arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get sessions")
+	}
+
+	rsp := convertListSessions(sessions)
+	return rsp, nil
 }

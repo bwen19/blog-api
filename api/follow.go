@@ -1,11 +1,11 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -27,8 +27,8 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 		return nil, status.Error(codes.InvalidArgument, "cannot follow yourself")
 	}
 
-	if req.GetIsLike() {
-		arg1 := sqlc.CreateFollowParams{
+	if req.GetLike() {
+		arg1 := db.CreateFollowParams{
 			UserID:     userID,
 			FollowerID: authUser.ID,
 		}
@@ -37,7 +37,7 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 			return nil, status.Error(codes.Internal, "failed to create follow")
 		}
 	} else {
-		arg := sqlc.DeleteFollowParams{
+		arg := db.DeleteFollowParams{
 			UserID:     userID,
 			FollowerID: authUser.ID,
 		}
@@ -52,38 +52,7 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 // -------------------------------------------------------------------
 // ListFollowers
 func (server *Server) ListFollows(ctx context.Context, req *pb.ListFollowsRequest) (*pb.ListFollowsResponse, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
-	}
-
-	arg1, err := parseListFollowsRequest(authUser, req)
-	if err != nil {
-		return nil, err
-	}
-
-	var rsp *pb.ListFollowsResponse
-	if req.GetIsFollower() {
-		followers, err := server.store.ListFollowers(ctx, *arg1)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to list follows")
-		}
-		rsp = convertListFollowers(followers)
-	} else {
-		arg2 := sqlc.ListFollowingsParams(*arg1)
-		followings, err := server.store.ListFollowings(ctx, arg2)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to list follows")
-		}
-		rsp = convertListFollowings(followings)
-	}
-
-	return rsp, nil
-}
-
-func parseListFollowsRequest(user AuthUser, req *pb.ListFollowsRequest) (*sqlc.ListFollowersParams, error) {
-	err := util.ValidatePage(req)
-	if err != nil {
+	if err := util.ValidatePage(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -91,11 +60,29 @@ func parseListFollowsRequest(user AuthUser, req *pb.ListFollowsRequest) (*sqlc.L
 		return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
 	}
 
-	params := &sqlc.ListFollowersParams{
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	arg := db.ListFollowersParams{
 		Limit:  req.GetPageSize(),
 		Offset: (req.GetPageId() - 1) * req.GetPageSize(),
 		UserID: req.GetUserId(),
-		SelfID: user.ID,
+		SelfID: authUser.ID,
 	}
-	return params, nil
+
+	if req.GetFollower() {
+		followers, err := server.store.ListFollowers(ctx, arg)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to list follows")
+		}
+		return convertListFollowers(followers), nil
+	} else {
+		followings, err := server.store.ListFollowings(ctx, db.ListFollowingsParams(arg))
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to list follows")
+		}
+		return convertListFollowings(followings), nil
+	}
 }

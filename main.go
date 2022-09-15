@@ -1,21 +1,23 @@
 package main
 
 import (
-	"blog/server/api"
-	"blog/server/db"
-	"blog/server/pb"
-	_ "blog/server/statik"
-	"blog/server/util"
 	"context"
+	"database/sql"
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/bwen19/blog/api"
+	"github.com/bwen19/blog/grpc/pb"
+	_ "github.com/bwen19/blog/grpc/statik"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/jackc/pgx/v4"
+	_ "github.com/lib/pq"
 	"github.com/rakyll/statik/fs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -29,7 +31,7 @@ func main() {
 		log.Fatal("cannot load config:", err)
 	}
 
-	conn, err := pgx.Connect(context.Background(), config.DBSource)
+	conn, err := sql.Open(config.DBDriver, config.DBSource)
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}

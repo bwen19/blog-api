@@ -31,3 +31,7 @@ func RandomString(n int) string {
 func RandomEmail() string {
 	return fmt.Sprintf("%s@email.com", RandomString(6))
 }
+
+func RandomImageName(ID int64) string {
+	return fmt.Sprintf("img-%d-%s-%d", ID, RandomString(6), time.Now().Unix())
+}

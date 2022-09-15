@@ -1,11 +1,11 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -44,7 +44,7 @@ func (server *Server) LeaveMessage(ctx context.Context, req *pb.LeaveMessageRequ
 		return nil, status.Error(codes.InvalidArgument, "content should not be empty")
 	}
 
-	arg := sqlc.CreateNotificationParams{
+	arg := db.CreateNotificationParams{
 		UserID:  authUser.ID,
 		Kind:    "admin",
 		Title:   title,
@@ -65,16 +65,16 @@ func (server *Server) DeleteNotifs(ctx context.Context, req *pb.DeleteNotifsRequ
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	notifIDs := util.RemoveDuplicates(req.GetNotificationIds())
-	for _, notifID := range notifIDs {
-		if err := util.ValidateID(notifID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "notificationID: %s", err.Error())
-		}
+	notifIDs, err := util.ValidateRepeatedIDs(req.GetNotificationIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "notificationID: %s", err.Error())
 	}
-	arg := sqlc.DeleteNotificationsParams{
+
+	arg := db.DeleteNotificationsParams{
 		Ids:    notifIDs,
 		UserID: authUser.ID,
 	}
+
 	nrows, err := server.store.DeleteNotifications(ctx, arg)
 	if err != nil || int64(len(notifIDs)) != nrows {
 		return nil, status.Error(codes.Internal, "failed to delete notifications")
@@ -86,26 +86,6 @@ func (server *Server) DeleteNotifs(ctx context.Context, req *pb.DeleteNotifsRequ
 // -------------------------------------------------------------------
 // ListNotifs
 func (server *Server) ListNotifs(ctx context.Context, req *pb.ListNotifsRequest) (*pb.ListNotifsResponse, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
-	}
-
-	arg, err := parseListNotifsRequest(authUser, req)
-	if err != nil {
-		return nil, err
-	}
-
-	notifs, err := server.store.ListNotifications(ctx, *arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get notifications")
-	}
-
-	rsp := convertListNotifs(notifs)
-	return rsp, nil
-}
-
-func parseListNotifsRequest(user AuthUser, req *pb.ListNotifsRequest) (*sqlc.ListNotificationsParams, error) {
 	if err := util.ValidatePage(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -114,24 +94,40 @@ func parseListNotifsRequest(user AuthUser, req *pb.ListNotifsRequest) (*sqlc.Lis
 		return nil, status.Errorf(codes.InvalidArgument, "kind: %s", err.Error())
 	}
 
-	params := &sqlc.ListNotificationsParams{
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	arg := db.ListNotificationsParams{
 		Limit:  req.GetPageSize(),
 		Offset: (req.GetPageId() - 1) * req.GetPageSize(),
-		UserID: user.ID,
+		UserID: authUser.ID,
 		Kind:   req.GetKind(),
 	}
-	return params, nil
+
+	notifs, err := server.store.ListNotifications(ctx, arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get notifications")
+	}
+
+	rsp := convertListNotifs(notifs)
+	return rsp, nil
 }
 
 // -------------------------------------------------------------------
 // ListMessages
 func (server *Server) ListMessages(ctx context.Context, req *pb.ListMessagesRequest) (*pb.ListMessagesResponse, error) {
-	arg, err := parseListMessagesRequest(req)
-	if err != nil {
-		return nil, err
+	if err := util.ValidatePage(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	messages, err := server.store.ListMessages(ctx, *arg)
+	arg := db.ListMessagesParams{
+		Limit:  req.GetPageSize(),
+		Offset: (req.GetPageId() - 1) * req.GetPageSize(),
+	}
+
+	messages, err := server.store.ListMessages(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get notifications")
 	}
@@ -140,30 +136,15 @@ func (server *Server) ListMessages(ctx context.Context, req *pb.ListMessagesRequ
 	return rsp, nil
 }
 
-func parseListMessagesRequest(req *pb.ListMessagesRequest) (*sqlc.ListMessagesParams, error) {
-	if err := util.ValidatePage(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	params := &sqlc.ListMessagesParams{
-		Limit:  req.GetPageSize(),
-		Offset: (req.GetPageId() - 1) * req.GetPageSize(),
-	}
-	return params, nil
-}
-
 // -------------------------------------------------------------------
 // CheckMessages
 func (server *Server) CheckMessages(ctx context.Context, req *pb.CheckMessagesRequest) (*emptypb.Empty, error) {
-	messageIDs := util.RemoveDuplicates(req.GetMessageIds())
-	for _, messageID := range messageIDs {
-		if err := util.ValidateID(messageID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "messageId: %s", err.Error())
-		}
+	messageIDs, err := util.ValidateRepeatedIDs(req.GetMessageIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "messageId: %s", err.Error())
 	}
 
-	err := server.store.CheckMessage(ctx, messageIDs)
-	if err != nil {
+	if err = server.store.CheckMessage(ctx, messageIDs); err != nil {
 		return nil, status.Error(codes.Internal, "failed to check messages")
 	}
 	return &emptypb.Empty{}, nil

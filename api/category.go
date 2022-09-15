@@ -1,12 +1,12 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 
-	"github.com/jackc/pgconn"
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
+	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -22,9 +22,9 @@ func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategory
 
 	category, err := server.store.CreateCategory(ctx, name)
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			switch pgErr.ConstraintName {
-			case "categories_name_key":
+		if pgErr, ok := err.(*pq.Error); ok {
+			switch pgErr.Code.Name() {
+			case "unique_voilation":
 				return nil, status.Errorf(codes.AlreadyExists, "category name already exists: %s", req.GetName())
 			}
 		}
@@ -38,11 +38,9 @@ func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategory
 // -------------------------------------------------------------------
 // DeleteCategories
 func (server *Server) DeleteCategories(ctx context.Context, req *pb.DeleteCategoriesRequest) (*emptypb.Empty, error) {
-	categoryIDs := util.RemoveDuplicates(req.GetCategoryIds())
-	for _, categoryID := range categoryIDs {
-		if err := util.ValidateID(categoryID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
-		}
+	categoryIDs, err := util.ValidateRepeatedIDs(req.GetCategoryIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
 	}
 
 	nrows, err := server.store.DeleteCategories(ctx, categoryIDs)
@@ -55,16 +53,24 @@ func (server *Server) DeleteCategories(ctx context.Context, req *pb.DeleteCatego
 // -------------------------------------------------------------------
 // UpdateCategory
 func (server *Server) UpdateCategory(ctx context.Context, req *pb.UpdateCategoryRequest) (*pb.UpdateCategoryResponse, error) {
-	arg, err := parseUpdateCategoryRequest(req)
-	if err != nil {
-		return nil, err
+	if err := util.ValidateID(req.GetCategoryId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
 	}
 
-	newCategory, err := server.store.UpdateCategory(ctx, *arg)
+	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
+	}
+
+	arg := db.UpdateCategoryParams{
+		ID:   req.GetCategoryId(),
+		Name: req.GetName(),
+	}
+
+	newCategory, err := server.store.UpdateCategory(ctx, arg)
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			switch pgErr.ConstraintName {
-			case "categories_name_key":
+		if pgErr, ok := err.(*pq.Error); ok {
+			switch pgErr.Code.Name() {
+			case "unique_voilation":
 				return nil, status.Errorf(codes.AlreadyExists, "category name already exists: %s", arg.Name)
 			}
 		}
@@ -75,33 +81,20 @@ func (server *Server) UpdateCategory(ctx context.Context, req *pb.UpdateCategory
 	return rsp, nil
 }
 
-func parseUpdateCategoryRequest(req *pb.UpdateCategoryRequest) (*sqlc.UpdateCategoryParams, error) {
-	categoryID := req.GetCategoryId()
-	if err := util.ValidateID(categoryID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
-	}
-
-	name := req.GetName()
-	if err := util.ValidateString(name, 1, 50); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
-	}
-
-	arg := &sqlc.UpdateCategoryParams{
-		ID:   categoryID,
-		Name: name,
-	}
-	return arg, nil
-}
-
 // -------------------------------------------------------------------
 // ListCategories
 func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategoriesRequest) (*pb.ListCategoriesResponse, error) {
-	arg, err := parseListCategoriesRequest(req)
-	if err != nil {
-		return nil, err
+	options := []string{"name", ""}
+	if err := util.ValidateOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	categories, err := server.store.ListCategories(ctx, *arg)
+	arg := db.ListCategoriesParams{
+		NameAsc:  req.GetOrderBy() == "name" && req.GetOrder() == "asc",
+		NameDesc: req.GetOrderBy() == "name" && req.GetOrder() == "desc",
+	}
+
+	categories, err := server.store.ListCategories(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
@@ -110,51 +103,8 @@ func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategories
 	return rsp, nil
 }
 
-func parseListCategoriesRequest(req *pb.ListCategoriesRequest) (*sqlc.ListCategoriesParams, error) {
-	options := []string{"name", ""}
-	err := util.ValidateOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	params := &sqlc.ListCategoriesParams{
-		NameAsc:  req.GetOrderBy() == "name" && req.GetOrder() == "asc",
-		NameDesc: req.GetOrderBy() == "name" && req.GetOrder() == "desc",
-	}
-	return params, nil
-}
-
 // -------------------------------------------------------------------
 // GetCategories
-func (server *Server) GetCategories(ctx context.Context, req *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
-	categories, err := server.store.GetCategories(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get categories")
-	}
-
-	rsp := &pb.GetCategoriesResponse{
-		Categories: convertCategories(categories),
-	}
-	return rsp, nil
-}
-
-// -------------------------------------------------------------------
-// Utils for post-category
-
-// setPostCategories
-func (server *Server) setPostCategories(ctx context.Context, postID int64, categoryIDs []int64) ([]sqlc.Category, error) {
-	arg := sqlc.SetPostCategoriesParams{
-		PostID:      postID,
-		CategoryIds: categoryIDs,
-	}
-	categories, err := server.store.SetPostCategories(ctx, arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to set post categories")
-	}
-
-	res := []sqlc.Category{}
-	for _, category := range categories {
-		res = append(res, sqlc.Category(category))
-	}
-	return res, nil
+func (server *Server) GetCategories(context.Context, *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCategories not implemented")
 }

@@ -1,13 +1,13 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 	"database/sql"
 	"log"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -65,7 +65,7 @@ func (server *Server) StreamInterceptor() grpc.StreamServerInterceptor {
 type authUserKey struct{}
 
 type AuthUser struct {
-	sqlc.User
+	db.User
 }
 
 // authFunc is the pluggable function that performs authentication
@@ -106,7 +106,7 @@ func (server *Server) authFunc(ctx context.Context, method string) (context.Cont
 		return ctx, status.Error(codes.Internal, "failed to get user")
 	}
 
-	if user.IsDeleted {
+	if user.Deleted {
 		return ctx, status.Error(codes.NotFound, "this user is inactive")
 	}
 

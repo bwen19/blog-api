@@ -1,15 +1,16 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 
 	"google.golang.org/grpc/codes"
 )
@@ -115,7 +116,7 @@ func (server *Server) extractTokenFromHeader(r *http.Request) (string, error) {
 }
 
 // authorization interceptor for http
-func (server *Server) authorize(r *http.Request, method string) (*sqlc.User, error) {
+func (server *Server) authorize(r *http.Request, method string) (*db.User, error) {
 	log.Println("call authorize: ", method)
 
 	allowedRoles, ok := server.allowedRoles[method]
@@ -145,7 +146,7 @@ func (server *Server) authorize(r *http.Request, method string) (*sqlc.User, err
 		return nil, NewHttpError(codes.Internal, "failed to get user")
 	}
 
-	if currUser.IsDeleted {
+	if currUser.Deleted {
 		return nil, NewHttpError(codes.NotFound, "this user is inactive")
 	}
 
