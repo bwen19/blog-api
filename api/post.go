@@ -1,14 +1,14 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,125 +16,46 @@ import (
 
 // -------------------------------------------------------------------
 // CreatePost
-func (server *Server) CreatePost(ctx context.Context, req *pb.CreatePostRequest) (*pb.CreatePostResponse, error) {
+func (server *Server) CreatePost(ctx context.Context, req *emptypb.Empty) (*pb.CreatePostResponse, error) {
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg1, arg2, err := parseCreatePostRequest(authUser, req)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	arg := db.CreateNewPostParams{
+		AuthorID:   authUser.ID,
+		Title:      "",
+		Abstract:   "",
+		CoverImage: server.config.DefaultCover,
+		Content:    "",
 	}
 
-	post, err := server.store.CreatePost(ctx, *arg1)
+	post, err := server.store.CreateNewPost(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create post")
 	}
 
-	categories := []sqlc.Category{}
-	if arg2.SetCategory {
-		categories, err = server.setPostCategories(ctx, post.ID, arg2.CategoryIDs)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	tags := []sqlc.Tag{}
-	if arg2.SetTag {
-		tags, err = server.setPostTags(ctx, post.ID, arg2.TagNames)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	rsp := &pb.CreatePostResponse{
-		Post: convertPost(post, categories, tags),
-	}
+	rsp := &pb.CreatePostResponse{Post: convertNewPost(post)}
 	return rsp, nil
 }
 
-type SetPostLabels struct {
-	SetCategory bool
-	CategoryIDs []int64
-	SetTag      bool
-	TagNames    []string
-}
-
-func parseCreatePostRequest(user AuthUser, req *pb.CreatePostRequest) (*sqlc.CreatePostParams, *SetPostLabels, error) {
-	title := req.GetTitle()
-	if err := util.ValidateString(title, 0, 200); err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "title: %s", err.Error())
-	}
-
-	abstract := req.GetAbstract()
-	if err := util.ValidateString(abstract, 0, 1000); err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "abstract: %s", err.Error())
-	}
-
-	coverImage := req.GetCoverImage()
-	if err := util.ValidateString(coverImage, 0, 200); err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "coverImage: %s", err.Error())
-	}
-
-	params1 := &sqlc.CreatePostParams{
-		AuthorID:   user.ID,
-		Title:      title,
-		Abstract:   abstract,
-		CoverImage: coverImage,
-		Content:    req.GetContent(),
-	}
-
-	categoryIDs := req.GetCategoryIds()
-	if len(categoryIDs) > 2 {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "post should not have more than 2 categories")
-	}
-	for _, categoryID := range categoryIDs {
-		if err := util.ValidateID(categoryID); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "categoryID: %s", err.Error())
-		}
-	}
-
-	tagNames := req.GetTagNames()
-	if len(tagNames) > 5 {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "post should not have more than 5 tags")
-	}
-	for _, tagName := range tagNames {
-		if err := util.ValidateString(tagName, 1, 50); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "tagName: %s", err.Error())
-		}
-	}
-
-	params2 := &SetPostLabels{
-		SetCategory: len(categoryIDs) > 0,
-		CategoryIDs: categoryIDs,
-		SetTag:      len(tagNames) > 0,
-		TagNames:    tagNames,
-	}
-	return params1, params2, nil
-}
-
 // -------------------------------------------------------------------
-// DeletePosts
-func (server *Server) DeletePosts(ctx context.Context, req *pb.DeletePostsRequest) (*emptypb.Empty, error) {
+// DeletePost
+func (server *Server) DeletePost(ctx context.Context, req *pb.DeletePostRequest) (*emptypb.Empty, error) {
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	postIDs := util.RemoveDuplicates(req.GetPostIds())
-	for _, postID := range postIDs {
-		if err := util.ValidateID(postID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-		}
-	}
-
-	arg := sqlc.DeletePostsParams{
-		Ids:      postIDs,
+	arg := db.DeletePostParams{
+		ID:       req.PostId,
 		AuthorID: authUser.ID,
 	}
-	nrows, err := server.store.DeletePosts(ctx, arg)
-	if err != nil || int64(len(postIDs)) != nrows {
+	if err := server.store.DeletePost(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete posts")
 	}
 
@@ -144,259 +65,171 @@ func (server *Server) DeletePosts(ctx context.Context, req *pb.DeletePostsReques
 // -------------------------------------------------------------------
 // UpdatePost
 func (server *Server) UpdatePost(ctx context.Context, req *pb.UpdatePostRequest) (*pb.UpdatePostResponse, error) {
+	if err := validateUpdatePostRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg1, arg2, err := parseUpdatePostRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	arg := db.UpdatePostParams{
+		ID:         req.GetPostId(),
+		AuthorID:   authUser.ID,
+		Title:      sql.NullString{String: req.GetTitle(), Valid: req.Title != nil},
+		Abstract:   sql.NullString{String: req.GetAbstract(), Valid: req.Abstract != nil},
+		CoverImage: sql.NullString{String: req.GetCoverImage(), Valid: req.CoverImage != nil},
 	}
 
-	newPost, err := server.store.UpdatePost(ctx, *arg1)
+	newPost, err := server.store.UpdatePost(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update post")
 	}
 
-	var categories []sqlc.Category
-	if arg2.SetCategory {
-		categories, err = server.setPostCategories(ctx, newPost.ID, arg2.CategoryIDs)
-		if err != nil {
-			return nil, err
+	var newContent db.PostContent
+	if req.Content != nil {
+		arg := db.UpdatePostContentParams{
+			ID:       req.GetPostId(),
+			Content:  req.GetContent(),
+			AuthorID: authUser.ID,
+		}
+		if newContent, err = server.store.UpdatePostContent(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to update post content")
+		}
+	}
+
+	var categories []db.Category
+	if req.CategoryIds != nil {
+		arg := db.SetPostCategoriesParams{
+			PostID:      newPost.ID,
+			CategoryIDs: req.GetCategoryIds(),
+		}
+		if categories, err = server.store.SetPostCategories(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to set post categories")
 		}
 	} else {
-		categories, err = server.store.GetPostCategories(ctx, newPost.ID)
-		if err != nil {
+		if categories, err = server.store.GetPostCategories(ctx, newPost.ID); err != nil {
 			return nil, status.Error(codes.Internal, "failed to get post categories")
 		}
 	}
 
-	var tags []sqlc.Tag
-	if arg2.SetTag {
-		tags, err = server.setPostTags(ctx, newPost.ID, req.GetPost().GetTagNames())
-		if err != nil {
-			return nil, err
+	var tags []db.Tag
+	if req.TagIds != nil {
+		arg := db.SetPostTagsParams{
+			PostID: newPost.ID,
+			TagIDs: req.GetTagIds(),
+		}
+		if tags, err = server.store.SetPostTags(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to set post tags")
 		}
 	} else {
-		tags, err = server.store.GetPostTags(ctx, newPost.ID)
-		if err != nil {
+		if tags, err = server.store.GetPostTags(ctx, newPost.ID); err != nil {
 			return nil, status.Error(codes.Internal, "failed to get post tags")
 		}
 	}
 
-	rsp := &pb.UpdatePostResponse{
-		Post: convertPost(newPost, categories, tags),
-	}
+	rsp := convertUpdatePost(newPost, newContent, categories, tags)
 	return rsp, nil
 }
 
-func parseUpdatePostRequest(user AuthUser, req *pb.UpdatePostRequest) (*sqlc.UpdatePostParams, *SetPostLabels, error) {
-	reqPost := req.GetPost()
-	postID := reqPost.GetId()
-
-	if err := util.ValidateID(postID); err != nil {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
+func validateUpdatePostRequest(req *pb.UpdatePostRequest) error {
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return fmt.Errorf("postID: %s", err.Error())
 	}
-	params1 := &sqlc.UpdatePostParams{
-		ID:       postID,
-		AuthorID: user.ID,
-	}
-	params2 := &SetPostLabels{}
 
-	for _, v := range req.GetUpdateMask().GetPaths() {
-		switch v {
-		case "title":
-			title := reqPost.GetTitle()
-			if err := util.ValidateString(title, 1, 200); err != nil {
-				return nil, nil, status.Errorf(codes.InvalidArgument, "title: %s", err.Error())
-			}
-			params1.Title = sql.NullString{String: title, Valid: true}
-		case "abstract":
-			abstract := reqPost.GetAbstract()
-			if abstract == "" {
-				return nil, nil, status.Error(codes.InvalidArgument, "abstract: must be a non empty string")
-			}
-			params1.Abstract = sql.NullString{String: abstract, Valid: true}
-		case "cover_image":
-			coverImage := reqPost.GetCoverImage()
-			if coverImage == "" {
-				return nil, nil, status.Error(codes.InvalidArgument, "coverImage: must be a non empty path")
-			}
-			params1.CoverImage = sql.NullString{String: coverImage, Valid: true}
-		case "content":
-			content := reqPost.GetContent()
-			if content == "" {
-				return nil, nil, status.Error(codes.InvalidArgument, "content: must be a non empty content")
-			}
-			params1.Content = sql.NullString{String: content, Valid: true}
-		case "category_ids":
-			categoryIDs := reqPost.GetCategoryIds()
-			if len(categoryIDs) > 2 {
-				return nil, nil, status.Error(codes.InvalidArgument, "post should not have more than 2 categories")
-			}
-			for _, categoryID := range categoryIDs {
-				if err := util.ValidateID(categoryID); err != nil {
-					return nil, nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
-				}
-			}
-			params2.SetCategory = true
-			params2.CategoryIDs = categoryIDs
-		case "tag_names":
-			tagNames := reqPost.GetTagNames()
-			if len(tagNames) > 5 {
-				return nil, nil, status.Error(codes.InvalidArgument, "post should not have more than 5 tags")
-			}
-			for _, tagName := range tagNames {
-				if err := util.ValidateString(tagName, 1, 50); err != nil {
-					return nil, nil, status.Errorf(codes.InvalidArgument, "tagName: %s", err.Error())
-				}
-			}
-			params2.SetTag = true
-			params2.TagNames = tagNames
+	if req.Title != nil {
+		if err := util.ValidateString(req.GetTitle(), 1, 200); err != nil {
+			return fmt.Errorf("title: %s", err.Error())
 		}
 	}
-	return params1, params2, nil
-}
 
-// -------------------------------------------------------------------
-// ListPosts
-func (server *Server) ListPosts(ctx context.Context, req *pb.ListPostsRequest) (*pb.ListPostsResponse, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if req.Abstract != nil {
+		if err := util.ValidateString(req.GetAbstract(), 1, 1000); err != nil {
+			return fmt.Errorf("abstract: %s", err.Error())
+		}
 	}
 
-	arg, err := parseListPostsRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	if req.CoverImage != nil {
+		if err := util.ValidateString(req.GetCoverImage(), 1, 100); err != nil {
+			return fmt.Errorf("coverImage: %s", err.Error())
+		}
 	}
 
-	posts, err := server.store.ListPosts(ctx, *arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to list posts")
-	}
-
-	rsp := convertListPosts(posts)
-	return rsp, nil
-}
-
-func parseListPostsRequest(user AuthUser, req *pb.ListPostsRequest) (*sqlc.ListPostsParams, error) {
-	options := []string{"publishAt", "updateAt"}
-	err := util.ValidatePageOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	params := &sqlc.ListPostsParams{
-		Limit:         req.GetPageSize(),
-		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
-		UpdateAtAsc:   req.GetOrderBy() == "updateAt" && req.GetOrder() == "asc",
-		UpdateAtDesc:  req.GetOrderBy() == "updateAt" && req.GetOrder() == "desc",
-		PublishAtAsc:  req.GetOrderBy() == "publishAt" && req.GetOrder() == "asc",
-		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
-		AnyStatus:     req.GetStatus() == "",
-		Status:        req.GetStatus(),
-		AuthorID:      user.ID,
-		AnyKeyword:    req.GetKeyword() == "",
-		Keyword:       "%" + req.GetKeyword() + "%",
-	}
-	return params, nil
+	return nil
 }
 
 // -------------------------------------------------------------------
 // SubmitPost
 func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest) (*emptypb.Empty, error) {
+	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	postIDs := util.RemoveDuplicates(req.GetPostIds())
-	for _, postID := range postIDs {
-		if err := util.ValidateID(postID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-		}
+	arg := db.UpdatePostStatusParams{
+		Ids:       postIDs,
+		Status:    "review",
+		OldStatus: []string{"draft", "revise"},
+		IsAdmin:   authUser.Role == "admin",
+		AuthorID:  authUser.ID,
 	}
 
-	arg1 := sqlc.SubmitPostParams{
-		Ids:      postIDs,
-		AuthorID: authUser.ID,
-	}
-
-	submitIDs, err := server.store.SubmitPost(ctx, arg1)
+	newPosts, err := server.store.UpdatePostStatus(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to submit posts")
 	}
 
-	for _, postID := range submitIDs {
-		arg2 := sqlc.CreateNotificationParams{
+	for _, post := range newPosts {
+		arg := db.CreateNotificationParams{
 			UserID:  authUser.ID,
 			Kind:    "admin",
 			Title:   "New post submitted",
-			Content: fmt.Sprintf("PostID %v has been submitted", postID),
+			Content: fmt.Sprintf("Post entitled \"%s\" has been submitted", post.Title),
 		}
 
-		err = server.store.CreateNotification(ctx, arg2)
+		err = server.store.CreateNotification(ctx, arg)
 		if err != nil {
 			log.Println("failed to create new notification for submitting post")
 		}
 	}
 
-	if len(submitIDs) != len(postIDs) {
+	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some submissions failed")
 	}
 	return &emptypb.Empty{}, nil
 }
 
 // -------------------------------------------------------------------
-// ReviewPost
-func (server *Server) ReviewPost(ctx context.Context, req *pb.ReviewPostRequest) (*pb.ReviewPostResponse, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
-	}
-
-	postID := req.GetPostId()
-	if err := util.ValidateID(postID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
-	}
-
-	arg := sqlc.ReviewPostParams{
-		PostID:   postID,
-		IsAdmin:  authUser.Role == "admin",
-		AuthorID: authUser.ID,
-	}
-	post, err := server.store.ReviewPost(ctx, arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get post")
-	}
-
-	rsp := convertReviewPost(post)
-	return rsp, nil
-}
-
-// -------------------------------------------------------------------
 // PublishPost
 func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostRequest) (*emptypb.Empty, error) {
-	postIDs := util.RemoveDuplicates(req.GetPostIds())
-	for _, postID := range postIDs {
-		if err := util.ValidateID(postID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-		}
+	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
 	}
 
-	publishPosts, err := server.store.PublishPost(ctx, postIDs)
+	arg := db.UpdatePostStatusParams{
+		Ids:       postIDs,
+		Status:    "publish",
+		OldStatus: []string{"review"},
+		IsAdmin:   true,
+	}
+	newPosts, err := server.store.UpdatePostStatus(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to publish posts")
 	}
 
-	for _, post := range publishPosts {
-		arg := sqlc.CreateNotificationParams{
+	for _, post := range newPosts {
+		arg := db.CreateNotificationParams{
 			UserID:  post.AuthorID,
 			Kind:    "system",
 			Title:   "New post published",
-			Content: fmt.Sprintf("Congratulations! PostID %v has been published", post.ID),
+			Content: fmt.Sprintf("Congratulations! Post entitled \"%s\" has been published", post.Title),
 		}
 
 		err = server.store.CreateNotification(ctx, arg)
@@ -405,7 +238,7 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 		}
 	}
 
-	if len(publishPosts) != len(postIDs) {
+	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some publications failed")
 	}
 	return &emptypb.Empty{}, nil
@@ -414,24 +247,28 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 // -------------------------------------------------------------------
 // WithdrawPost
 func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequest) (*emptypb.Empty, error) {
-	postIDs := util.RemoveDuplicates(req.GetPostIds())
-	for _, postID := range postIDs {
-		if err := util.ValidateID(postID); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-		}
+	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
 	}
 
-	withdrawPosts, err := server.store.WithdrawPost(ctx, postIDs)
+	arg := db.UpdatePostStatusParams{
+		Ids:       postIDs,
+		Status:    "revise",
+		OldStatus: []string{"publish", "review"},
+		IsAdmin:   true,
+	}
+	withdrawPosts, err := server.store.UpdatePostStatus(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to withdraw posts")
 	}
 
 	for _, post := range withdrawPosts {
-		arg := sqlc.CreateNotificationParams{
+		arg := db.CreateNotificationParams{
 			UserID:  post.AuthorID,
 			Kind:    "system",
 			Title:   "Post withdrawn",
-			Content: fmt.Sprintf("PostID %v has been withdrawn", post.ID),
+			Content: fmt.Sprintf("Post \"%s\" has been withdrawn", post.Title),
 		}
 
 		err = server.store.CreateNotification(ctx, arg)
@@ -447,168 +284,223 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 }
 
 // -------------------------------------------------------------------
-// ChangePost
-func (server *Server) ChangePost(ctx context.Context, req *pb.ChangePostRequest) (*emptypb.Empty, error) {
-	reqPost := req.GetPost()
-
-	postID := reqPost.GetId()
-	if err := util.ValidateID(postID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-	}
-
-	for _, v := range req.GetUpdateMask().GetPaths() {
-		switch v {
-		case "category_ids":
-			categoryIDs := reqPost.GetCategoryIds()
-			if len(categoryIDs) > 2 {
-				return nil, status.Error(codes.InvalidArgument, "post should not have more than 2 categories")
-			}
-			for _, categoryID := range categoryIDs {
-				if err := util.ValidateID(categoryID); err != nil {
-					return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
-				}
-			}
-			_, err := server.setPostCategories(ctx, postID, categoryIDs)
-			if err != nil {
-				return nil, err
-			}
-		case "is_featured":
-			arg := sqlc.FeaturePostParams{
-				ID:         postID,
-				IsFeatured: req.Post.GetIsFeatured(),
-			}
-			nrows, err := server.store.FeaturePost(ctx, arg)
-			if err != nil || nrows != 1 {
-				return nil, status.Error(codes.Internal, "failed to update post is_featured")
-			}
-		}
-	}
-	return &emptypb.Empty{}, nil
-}
-
-// -------------------------------------------------------------------
-// GetPosts
-func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*pb.GetPostsResponse, error) {
-	arg, err := parseGetPostsRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	posts, err := server.store.GetPosts(ctx, *arg)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to list posts")
-	}
-
-	rsp := convertGetPosts(posts)
-	return rsp, nil
-}
-
-func parseGetPostsRequest(req *pb.GetPostsRequest) (*sqlc.GetPostsParams, error) {
-	options := []string{"publishAt", "updateAt"}
-	err := util.ValidatePageOrder(req, options)
+// UpdatePostLabel
+func (server *Server) UpdatePostLabel(ctx context.Context, req *pb.UpdatePostLabelRequest) (*emptypb.Empty, error) {
+	categoryIDs, tagIDs, err := validateUpdatePostLabelRequest(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	params := &sqlc.GetPostsParams{
+	if req.Featured != nil {
+		arg := db.UpdatePostFeatureParams{
+			ID:       req.GetPostId(),
+			Featured: req.GetFeatured(),
+		}
+		if err := server.store.UpdatePostFeature(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to update post feature")
+		}
+	}
+
+	if req.CategoryIds != nil {
+		arg := db.SetPostCategoriesParams{
+			PostID:      req.GetPostId(),
+			CategoryIDs: categoryIDs,
+		}
+		if _, err := server.store.SetPostCategories(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to update post categories")
+		}
+	}
+
+	if req.TagIds != nil {
+		arg := db.SetPostTagsParams{
+			PostID: req.GetPostId(),
+			TagIDs: tagIDs,
+		}
+		if _, err := server.store.SetPostTags(ctx, arg); err != nil {
+			return nil, status.Error(codes.Internal, "failed to update post tags")
+		}
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+func validateUpdatePostLabelRequest(req *pb.UpdatePostLabelRequest) ([]int64, []int64, error) {
+	var err error
+	if err = util.ValidateID(req.GetPostId()); err != nil {
+		return nil, nil, fmt.Errorf("postID: %s", err.Error())
+	}
+
+	var categoryIDs []int64
+	if req.CategoryIds != nil {
+		if categoryIDs, err = util.ValidateRepeatedIDs(req.GetCategoryIds()); err != nil {
+			return nil, nil, fmt.Errorf("categoryID: %s", err.Error())
+		}
+		if len(categoryIDs) > 2 {
+			return nil, nil, fmt.Errorf("post should not have more than 2 categories")
+		}
+	}
+
+	var tagIDs []int64
+	if req.TagIds != nil {
+		if tagIDs, err = util.ValidateRepeatedIDs(req.GetTagIds()); err != nil {
+			return nil, nil, fmt.Errorf("tagID: %s", err.Error())
+		}
+		if len(tagIDs) > 5 {
+			return nil, nil, fmt.Errorf("post should not have more than 5 tags")
+		}
+	}
+
+	return categoryIDs, tagIDs, nil
+}
+
+// -------------------------------------------------------------------
+// ListPosts
+func (server *Server) ListPosts(ctx context.Context, req *pb.ListPostsRequest) (*pb.ListPostsResponse, error) {
+	options := []string{"publishAt", "updateAt", "viewCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if req.Status != nil {
+		options = []string{"publish", "review", "revise", "draft"}
+		if err := util.ValidateOneOf(req.GetStatus(), options); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "status: %s", err.Error())
+		}
+	}
+
+	if req.Keyword != nil {
+		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "keyword: %s", err.Error())
+		}
+	}
+
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	arg := db.ListPostsParams{
 		Limit:         req.GetPageSize(),
 		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
 		UpdateAtAsc:   req.GetOrderBy() == "updateAt" && req.GetOrder() == "asc",
 		UpdateAtDesc:  req.GetOrderBy() == "updateAt" && req.GetOrder() == "desc",
 		PublishAtAsc:  req.GetOrderBy() == "publishAt" && req.GetOrder() == "asc",
 		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
-		AnyStatus:     req.GetStatus() == "",
+		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
+		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
+		IsAdmin:       authUser.Role == "admin",
+		AuthorID:      authUser.ID,
+		AnyStatus:     req.Status == nil,
 		Status:        req.GetStatus(),
-		AnyKeyword:    req.GetKeyword() == "",
+		AnyKeyword:    req.Keyword == nil,
 		Keyword:       "%" + req.GetKeyword() + "%",
 	}
-	return params, nil
+
+	posts, err := server.store.ListPosts(ctx, arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list posts")
+	}
+
+	return convertListPosts(posts), nil
 }
 
 // -------------------------------------------------------------------
-// StarPost
-func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*emptypb.Empty, error) {
+// GetPost
+func (server *Server) GetPost(ctx context.Context, req *pb.GetPostRequest) (*pb.GetPostResponse, error) {
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	postID := req.GetPostId()
-	if err := util.ValidateID(postID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
+	arg := db.GetPostParams{
+		PostID:   req.GetPostId(),
+		IsAdmin:  authUser.Role == "admin",
+		AuthorID: authUser.ID,
 	}
 
-	if req.GetIsLike() {
-		arg := sqlc.CreatePostStarParams{
-			PostID: postID,
-			UserID: authUser.ID,
-		}
-		err := server.store.CreatePostStar(ctx, arg)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to create post star")
-		}
-	} else {
-		arg := sqlc.DeletePostStarParams{
-			PostID: postID,
-			UserID: authUser.ID,
-		}
-		err := server.store.DeletePostStar(ctx, arg)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to delete post star")
-		}
+	post, err := server.store.GetPost(ctx, arg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get post")
 	}
-	return &emptypb.Empty{}, nil
+
+	return convertGetPost(post), nil
 }
 
 // -------------------------------------------------------------------
-// FetchPosts
-func (server *Server) FetchPosts(ctx context.Context, req *pb.FetchPostsRequest) (*pb.FetchPostsResponse, error) {
+// GetPosts
+func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*pb.GetPostsResponse, error) {
+	if err := validateGetPostsRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	var authUser AuthUser
 	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
 		authUser = user
 	}
 
-	arg, err := parseFetchPostsRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	arg := db.GetPostsParams{
+		Limit:         req.GetPageSize(),
+		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
+		PublishAtAsc:  req.GetOrderBy() == "publishAt" && req.GetOrder() == "asc",
+		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
+		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
+		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
+		SelfID:        authUser.ID,
+		AnyFeatured:   req.Featured == nil,
+		Featured:      req.GetFeatured(),
+		AnyAuthor:     req.AuthorId == nil,
+		AuthorID:      req.GetAuthorId(),
+		AnyCategory:   req.CategoryId == nil,
+		CategoryID:    req.GetCategoryId(),
+		AnyTag:        req.TagId == nil,
+		TagID:         req.GetTagId(),
+		AnyKeyword:    req.Keyword == nil,
+		Keyword:       "%" + req.GetKeyword() + "%",
 	}
 
-	posts, err := server.store.FetchPosts(ctx, *arg)
+	posts, err := server.store.GetPosts(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list posts")
 	}
 
-	rsp := convertFetchPosts(posts)
-	return rsp, nil
+	return convertGetPosts(posts), nil
 }
 
-func parseFetchPostsRequest(user AuthUser, req *pb.FetchPostsRequest) (*sqlc.FetchPostsParams, error) {
-	options := []string{"viewCount", "publishAt"}
-	err := util.ValidatePageOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+func validateGetPostsRequest(req *pb.GetPostsRequest) error {
+	options := []string{"publishAt", "viewCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return err
 	}
 
-	params := &sqlc.FetchPostsParams{
-		Limit:         req.GetPageSize(),
-		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
-		SelfID:        user.ID,
-		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
-		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
-		PublishAtAsc:  req.GetOrderBy() == "publishAt" && req.GetOrder() == "asc",
-		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
-		AnyFeatured:   !req.GetIsFeatured(),
-		IsFeatured:    req.GetIsFeatured(),
-		AnyAuthor:     req.GetAuthorId() == 0,
-		AuthorID:      req.GetAuthorId(),
-		AnyCategory:   req.GetCategoryId() == 0,
-		CategoryID:    req.GetCategoryId(),
-		AnyTag:        req.GetTagId() == 0,
-		TagID:         req.GetTagId(),
-		AnyKeyword:    req.GetKeyword() == "",
-		Keyword:       "%" + req.GetKeyword() + "%",
+	if req.AuthorId != nil {
+		if err := util.ValidateID(req.GetAuthorId()); err != nil {
+			return fmt.Errorf("authorId: %s", err.Error())
+		}
 	}
-	return params, nil
+
+	if req.CategoryId != nil {
+		if err := util.ValidateID(req.GetCategoryId()); err != nil {
+			return fmt.Errorf("categoryId: %s", err.Error())
+		}
+	}
+
+	if req.TagId != nil {
+		if err := util.ValidateID(req.GetTagId()); err != nil {
+			return fmt.Errorf("tagId: %s", err.Error())
+		}
+	}
+
+	if req.Keyword != nil {
+		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
+			return fmt.Errorf("keyword: %s", err.Error())
+		}
+	}
+
+	return nil
 }
 
 // -------------------------------------------------------------------
@@ -624,7 +516,7 @@ func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*p
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
 	}
 
-	arg := sqlc.ReadPostParams{
+	arg := db.ReadPostParams{
 		PostID: postID,
 		SelfID: authUser.ID,
 	}
@@ -635,4 +527,39 @@ func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*p
 
 	rsp := convertReadPost(post)
 	return rsp, nil
+}
+
+// -------------------------------------------------------------------
+// StarPost
+func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	postID := req.GetPostId()
+	if err := util.ValidateID(postID); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
+	}
+
+	if req.GetLike() {
+		arg := db.CreatePostStarParams{
+			PostID: postID,
+			UserID: authUser.ID,
+		}
+		err := server.store.CreatePostStar(ctx, arg)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to create post star")
+		}
+	} else {
+		arg := db.DeletePostStarParams{
+			PostID: postID,
+			UserID: authUser.ID,
+		}
+		err := server.store.DeletePostStar(ctx, arg)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to delete post star")
+		}
+	}
+	return &emptypb.Empty{}, nil
 }

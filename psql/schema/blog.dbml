@@ -1,0 +1,149 @@
+Project blog {
+  database_type: 'PostgreSQL'
+  Note: 'Blog Database'
+}
+
+Table users as U {
+  id bigserial [pk]
+  username varchar [not null, unique]
+  email varchar [not null, unique]
+  hashed_password varchar [not null]
+  avatar varchar [not null]
+  intro varchar [not null, default: '']
+  role varchar [not null, default: 'user']
+  deleted boolean [not null, default: false]
+  create_at timestamptz [not null, default: `now()`]
+}
+
+Table sessions as S {
+  id uuid [pk]
+  user_id bigint [not null]
+  refresh_token varchar [not null]
+  user_agent varchar [not null]
+  client_ip varchar [not null]
+  expires_at timestamptz [not null]
+  create_at timestamptz [not null, default: `now()`]
+}
+
+Table notifications as N {
+  id bigserial [pk]
+  user_id bigint [not null]
+  kind varchar [not null]
+  title varchar [not null]
+  content text [not null]
+  unread boolean [not null, default: true]
+  create_at timestamptz [not null, default: `now()`]
+}
+
+Table follows as F {
+  user_id bigint
+  follower_id bigint
+  create_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, follower_id) [pk]
+  }
+}
+
+Table posts as P {
+  id bigserial [pk]
+  author_id bigint [not null]
+  title varchar [not null]
+  abstract text [not null]
+  cover_image varchar [not null]
+  status varchar [not null, default: 'draft']
+  featured boolean [not null, default: false]
+  view_count bigint [not null, default: 0]
+  update_at timestamptz [not null, default: `now()`]
+  publish_at timestamptz [not null, default: `now()`]
+}
+
+Table post_contents as PB {
+  id bigint [pk]
+  content text [not null]
+}
+
+Table post_stars as PS {
+  post_id bigint
+  user_id bigint
+  create_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (post_id, user_id) [pk]
+  }
+}
+
+Table categories as C {
+  id bigserial [pk]
+  name varchar [not null, unique]
+}
+
+Table post_categories as PC {
+  post_id bigint
+  category_id bigint
+
+  indexes {
+    (post_id, category_id) [pk]
+  }
+}
+
+Table tags as T {
+  id bigserial [pk]
+  name varchar [not null, unique]
+}
+
+Table post_tags as PT {
+  post_id bigint
+  tag_id bigint
+
+  indexes {
+    (post_id, tag_id) [pk]
+  }
+}
+
+Table comments as CM {
+  id bigserial [pk]
+  post_id bigint [not null]
+  user_id bigint [not null]
+  parent_id bigint
+  reply_user_id bigint
+  content text [not null]
+  create_at timestamptz [not null, default: `now()`]
+}
+
+Table comment_stars as CMS {
+  comment_id bigint
+  user_id bigint
+
+  indexes {
+    (comment_id, user_id) [pk]
+  }
+}
+
+Ref: S.user_id > U.id [delete: cascade, update: no action]
+
+Ref: N.user_id > U.id [delete: cascade, update: no action]
+
+Ref: F.user_id > U.id [delete: cascade, update: no action]
+Ref: F.follower_id > U.id [delete: cascade, update: no action]
+
+Ref: P.author_id > U.id [delete: no action, update: no action]
+
+Ref: P.id - PB.id [delete: cascade, update: no action]
+
+Ref: PS.post_id > P.id [delete: cascade, update: no action]
+Ref: PS.user_id > U.id [delete: cascade, update: no action]
+
+Ref: PC.post_id > P.id [delete: cascade, update: no action]
+Ref: PC.category_id > C.id [delete: cascade, update: no action]
+
+Ref: PT.post_id > P.id [delete: cascade, update: no action]
+Ref: PT.tag_id > T.id [delete: cascade, update: no action]
+
+Ref: CM.post_id > P.id [delete: cascade, update: no action]
+Ref: CM.user_id > U.id [delete: cascade, update: no action]
+Ref: CM.parent_id > CM.id [delete: cascade, update: no action]
+Ref: CM.reply_user_id > U.id [delete: set null, update: no action]
+
+Ref: CMS.comment_id > CM.id [delete: cascade, update: no action]
+Ref: CMS.user_id > U.id [delete: cascade, update: no action]

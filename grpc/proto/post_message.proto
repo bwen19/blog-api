@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+import "common_message.proto";
+
+option go_package = "github.com/bwen19/blog/grpc/pb";
+
+message Post {
+    int64 id = 1;
+    string title = 2;
+    string abstract = 3;
+    string cover_image = 4;
+    string content = 5;
+    repeated Category categories = 6;
+    repeated Tag tags = 7;
+    bool featured = 8;
+    string status = 9;
+}
+
+message PostItem {
+    int64 id = 1;
+    string title = 2;
+    User author = 3;
+    repeated Category categories = 4;
+    repeated Tag tags = 5;
+    string status = 6;
+    bool featured = 7;
+    int64 view_count = 8;
+    google.protobuf.Timestamp update_at = 9;
+    google.protobuf.Timestamp publish_at = 10;
+}
+
+message CreatePostResponse {
+    Post post = 1;
+}
+
+message DeletePostRequest {
+    int64 post_id = 1;
+}
+
+message UpdatePostRequest {
+    int64 post_id = 1;
+    optional string title = 2;
+    optional string abstract = 3;
+    optional string cover_image = 4;
+    optional string content = 5;
+    repeated int64 category_ids = 6;
+    repeated int64 tag_ids = 7;
+}
+message UpdatePostResponse {
+    Post post = 1;
+}
+
+message SubmitPostRequest {
+    repeated int64 post_ids = 1;
+}
+
+message PublishPostRequest {
+    repeated int64 post_ids = 1;
+}
+
+message WithdrawPostRequest {
+    repeated int64 post_ids = 1;
+}
+
+message UpdatePostLabelRequest {
+    int64 post_id = 1;
+    repeated int64 category_ids = 2;
+    repeated int64 tag_ids = 3;
+    optional bool featured = 4;
+}
+
+message ListPostsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string order_by = 4;
+    optional string status = 5;
+    optional string keyword = 6;
+}
+message ListPostsResponse {
+    int64 total = 1;
+    repeated PostItem posts = 2;
+}
+
+message GetPostRequest {
+    int64 post_id = 1;
+}
+message GetPostResponse {
+    Post post = 1;
+}
+
+message GetPostsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    string order = 3;
+    string order_by = 4;
+    optional bool featured = 5;
+    optional int64 author_id = 6;
+    optional int64 category_id = 7;
+    optional int64 tag_id = 8;
+    optional string keyword = 9;
+}
+message GetPostsResponse {
+    message PostItem {
+        int64 id = 1;
+        string title = 2;
+        UserInfo author = 3;
+        string abstract = 4;
+        string cover_image = 5;
+        repeated Tag tags = 6;
+        int64 view_count = 7;
+        int64 star_count = 8;
+        int64 comment_count = 9;
+        google.protobuf.Timestamp publish_at = 10;
+    }
+    int64 total = 1;
+    repeated PostItem posts = 2;
+}
+
+message ReadPostRequest {
+    int64 post_id = 1;
+}
+message ReadPostResponse {
+    message Post {
+        int64 id = 1;
+        string title = 2;
+        UserInfo author = 3;
+        string content = 4;
+        repeated Category categories = 5;
+        repeated Tag tags = 6;
+        int64 view_count = 7;
+        int64 star_count = 8;
+        google.protobuf.Timestamp publish_at = 9;
+    }
+    Post post = 1;
+}
+
+message StarPostRequest {
+    int64 post_id = 1;
+    bool like = 2;
+}

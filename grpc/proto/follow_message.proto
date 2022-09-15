@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package pb;
+
+import "common_message.proto";
+
+option go_package = "github.com/bwen19/blog/grpc/pb";
+
+message FollowUserRequest {
+    int64 user_id = 1;
+    bool like = 2;
+}
+
+message ListFollowsRequest {
+    int32 page_id = 1;
+    int32 page_size = 2;
+    int64 user_id = 3;
+    bool follower = 4;
+}
+message ListFollowsResponse {
+    int64 total = 1;
+    repeated UserInfo users = 2;
+}

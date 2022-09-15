@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package pb;
+
+import "common_message.proto";
+
+option go_package = "github.com/bwen19/blog/grpc/pb";
+
+message CreateCategoryRequest {
+    string name = 1;
+}
+message CreateCategoryResponse {
+    Category category = 1;
+}
+
+message DeleteCategoriesRequest {
+    repeated int64 category_ids = 1;
+}
+
+message UpdateCategoryRequest {
+    int64 category_id = 1;
+    string name = 2;
+}
+message UpdateCategoryResponse {
+    Category category = 1;
+}
+
+message ListCategoriesRequest {
+    string order = 1;
+    string order_by = 2;
+}
+message ListCategoriesResponse {
+    message CategoryItem {
+        int64 id = 1;
+        string name = 2;
+        int64 post_count = 3;
+    }
+    repeated CategoryItem categories = 1;
+}
+
+message GetCategoriesResponse {
+    repeated Category categories = 1;
+}

@@ -1,13 +1,14 @@
 package api
 
 import (
-	"blog/server/db/sqlc"
-	"blog/server/pb"
-	"blog/server/util"
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 
+	"github.com/bwen19/blog/grpc/pb"
+	"github.com/bwen19/blog/psql/db"
+	"github.com/bwen19/blog/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,17 +17,24 @@ import (
 // -------------------------------------------------------------------
 // CreateComment
 func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRequest) (*pb.CreateCommentResponse, error) {
+	if err := validateCreateCommentRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
 	if !ok {
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	arg1, err := parseCreateCommentRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	arg := db.CreateCommentParams{
+		PostID:      req.GetPostId(),
+		UserID:      authUser.ID,
+		ParentID:    sql.NullInt64{Int64: req.GetParentId(), Valid: req.ParentId != nil},
+		ReplyUserID: sql.NullInt64{Int64: req.GetReplyUserId(), Valid: req.ReplyUserId != nil},
+		Content:     req.GetContent(),
 	}
 
-	comment, err := server.store.CreateComment(ctx, *arg1)
+	comment, err := server.store.CreateComment(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create comment")
 	}
@@ -35,7 +43,7 @@ func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRe
 	if comment.ReplyUserID.Valid {
 		userID = comment.ReplyUserID.Int64
 	}
-	arg2 := sqlc.CreateNotificationParams{
+	arg2 := db.CreateNotificationParams{
 		UserID:  userID,
 		Kind:    "reply",
 		Title:   "New Comment at You",
@@ -51,28 +59,28 @@ func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRe
 	return rsp, nil
 }
 
-func parseCreateCommentRequest(user AuthUser, req *pb.CreateCommentRequest) (*sqlc.CreateCommentParams, error) {
-	postID := req.GetPostId()
-	if err := util.ValidateID(postID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+func validateCreateCommentRequest(req *pb.CreateCommentRequest) error {
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return fmt.Errorf("postId: %s", err.Error())
 	}
 
-	parentID := req.GetParentId()
-	replyUserID := req.GetReplyUserId()
-
-	content := req.GetContent()
-	if err := util.ValidateString(content, 1, 500); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "content: %s", err.Error())
+	if req.ParentId != nil {
+		if err := util.ValidateID(req.GetParentId()); err != nil {
+			return fmt.Errorf("parentId: %s", err.Error())
+		}
 	}
 
-	params := &sqlc.CreateCommentParams{
-		PostID:      postID,
-		UserID:      user.ID,
-		ParentID:    sql.NullInt64{Int64: parentID, Valid: parentID > 0},
-		ReplyUserID: sql.NullInt64{Int64: replyUserID, Valid: replyUserID > 0},
-		Content:     content,
+	if req.ReplyUserId != nil {
+		if err := util.ValidateID(req.GetReplyUserId()); err != nil {
+			return fmt.Errorf("replyUserId: %s", err.Error())
+		}
 	}
-	return params, nil
+
+	if err := util.ValidateString(req.GetContent(), 1, 500); err != nil {
+		return fmt.Errorf("content: %s", err.Error())
+	}
+
+	return nil
 }
 
 // -------------------------------------------------------------------
@@ -88,7 +96,7 @@ func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRe
 		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
 	}
 
-	arg := sqlc.DeleteCommentParams{
+	arg := db.DeleteCommentParams{
 		ID:      commentID,
 		IsAdmin: authUser.Role == "admin",
 		UserID:  authUser.ID,
@@ -103,17 +111,32 @@ func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRe
 // -------------------------------------------------------------------
 // ListComments
 func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequest) (*pb.ListCommentsResponse, error) {
+	options := []string{"createAt", "starCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
 	var authUser AuthUser
 	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
 		authUser = user
 	}
 
-	arg, err := parseListCommentsRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	arg := db.ListCommentsParams{
+		Limit:         req.GetPageSize(),
+		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
+		PostID:        req.GetPostId(),
+		SelfID:        authUser.ID,
+		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
+		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
+		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
+		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 	}
 
-	comments, err := server.store.ListComments(ctx, *arg)
+	comments, err := server.store.ListComments(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
@@ -122,76 +145,41 @@ func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequ
 	return rsp, nil
 }
 
-func parseListCommentsRequest(user AuthUser, req *pb.ListCommentsRequest) (*sqlc.ListCommentsParams, error) {
-	options := []string{"createAt", "starCount"}
-	err := util.ValidatePageOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	postID := req.GetPostId()
-	if err := util.ValidateID(postID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
-	}
-
-	params := &sqlc.ListCommentsParams{
-		Limit:         req.GetPageSize(),
-		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
-		PostID:        postID,
-		SelfID:        user.ID,
-		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
-		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
-		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
-		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
-	}
-	return params, nil
-}
-
 // -------------------------------------------------------------------
 // ListReplies
 func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesRequest) (*pb.ListRepliesResponse, error) {
+	options := []string{"createAt", "starCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := util.ValidateID(req.GetCommentId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	}
+
 	var authUser AuthUser
 	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
 		authUser = user
 	}
 
-	arg, err := parseListRepliesRequest(authUser, req)
-	if err != nil {
-		return nil, err
+	arg := db.ListRepliesParams{
+		Limit:         req.GetPageSize(),
+		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
+		ParentID:      req.GetCommentId(),
+		SelfID:        authUser.ID,
+		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
+		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
+		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
+		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 	}
 
-	replies, err := server.store.ListReplies(ctx, *arg)
+	replies, err := server.store.ListReplies(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
 
 	rsp := convertListReplies(replies)
 	return rsp, nil
-}
-
-func parseListRepliesRequest(user AuthUser, req *pb.ListRepliesRequest) (*sqlc.ListRepliesParams, error) {
-	options := []string{"createAt", "starCount"}
-	err := util.ValidatePageOrder(req, options)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	commentID := req.GetCommentId()
-	if err := util.ValidateID(commentID); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
-	}
-
-	params := &sqlc.ListRepliesParams{
-		Limit:         req.GetPageSize(),
-		Offset:        (req.GetPageId() - 1) * req.GetPageSize(),
-		ParentID:      commentID,
-		SelfID:        user.ID,
-		StarCountAsc:  req.GetOrderBy() == "starCount" && req.GetOrder() == "asc",
-		StarCountDesc: req.GetOrderBy() == "starCount" && req.GetOrder() == "desc",
-		CreateAtAsc:   req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
-		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
-	}
-	return params, nil
 }
 
 // -------------------------------------------------------------------
@@ -207,8 +195,8 @@ func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentReques
 		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
 	}
 
-	if req.GetIsLike() {
-		arg := sqlc.CreateCommentStarParams{
+	if req.GetLike() {
+		arg := db.CreateCommentStarParams{
 			CommentID: commentID,
 			UserID:    authUser.ID,
 		}
@@ -217,7 +205,7 @@ func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentReques
 			return nil, status.Error(codes.Internal, "failed to create comment star")
 		}
 	} else {
-		arg := sqlc.DeleteCommentStarParams{
+		arg := db.DeleteCommentStarParams{
 			CommentID: commentID,
 			UserID:    authUser.ID,
 		}
