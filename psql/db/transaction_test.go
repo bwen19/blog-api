@@ -9,7 +9,7 @@ import (
 )
 
 func createRandomPost(t *testing.T) CreateNewPostRow {
-	store := NewStore(testDB)
+	// store := NewStore(testDB)
 	user := createRandomUser(t)
 
 	arg := CreateNewPostParams{
@@ -20,7 +20,7 @@ func createRandomPost(t *testing.T) CreateNewPostRow {
 		Content:    util.RandomString(100),
 	}
 
-	post, err := store.CreateNewPost(context.Background(), arg)
+	post, err := testStore.CreateNewPost(context.Background(), arg)
 	require.NoError(t, err)
 	require.NotEmpty(t, post)
 
@@ -40,13 +40,39 @@ func TestCreatePost(t *testing.T) {
 	createRandomPost(t)
 }
 
-func TestDeletePosts(t *testing.T) {
-	post1 := createRandomPost(t)
+func TestSetPostCategories(t *testing.T) {
+	// store := NewStore(testDB)
+	post := createRandomPost(t)
 
-	arg := DeletePostParams{
-		ID:       post1.ID,
-		AuthorID: post1.AuthorID,
+	cateIDs := []int64{}
+	for i := 0; i < 2; i++ {
+		cate := createRandomCategory(t)
+		cateIDs = append(cateIDs, cate.ID)
 	}
-	err := testQueries.DeletePost(context.Background(), arg)
+
+	arg := SetPostCategoriesParams{
+		PostID:      post.ID,
+		CategoryIDs: cateIDs,
+	}
+
+	cates, err := testStore.SetPostCategories(context.Background(), arg)
 	require.NoError(t, err)
+	require.NotEmpty(t, cates)
+	require.Equal(t, len(cates), 2)
+
+	cateIDs = []int64{}
+	for i := 0; i < 3; i++ {
+		cate := createRandomCategory(t)
+		cateIDs = append(cateIDs, cate.ID)
+	}
+
+	arg = SetPostCategoriesParams{
+		PostID:      post.ID,
+		CategoryIDs: cateIDs,
+	}
+
+	cates, err = testStore.SetPostCategories(context.Background(), arg)
+	require.NoError(t, err)
+	require.NotEmpty(t, cates)
+	require.Equal(t, len(cates), 3)
 }

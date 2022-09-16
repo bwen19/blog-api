@@ -133,31 +133,16 @@ func (q *Queries) GetPostTags(ctx context.Context, postID int64) ([]Tag, error) 
 	return items, nil
 }
 
-const getTagsByNames = `-- name: GetTagsByNames :many
-SELECT id, name FROM tags WHERE name = ANY($1::varchar[])
+const getTagsByName = `-- name: GetTagsByName :one
+SELECT id, name FROM tags
+WHERE name = $1::varchar LIMIT 1
 `
 
-func (q *Queries) GetTagsByNames(ctx context.Context, name []string) ([]Tag, error) {
-	rows, err := q.db.QueryContext(ctx, getTagsByNames, pq.Array(name))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Tag{}
-	for rows.Next() {
-		var i Tag
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetTagsByName(ctx context.Context, name string) (Tag, error) {
+	row := q.db.QueryRowContext(ctx, getTagsByName, name)
+	var i Tag
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
 const listTags = `-- name: ListTags :many

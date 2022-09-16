@@ -137,8 +137,7 @@ func (server *Server) authorize(r *http.Request, method string) (*db.User, error
 		return nil, NewHttpError(codes.Unauthenticated, err.Error())
 	}
 
-	ctx := r.Context()
-	currUser, err := server.store.GetUser(ctx, accessPayload.UserID)
+	currUser, err := server.store.GetUser(r.Context(), accessPayload.UserID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, NewHttpError(codes.NotFound, "user not found")

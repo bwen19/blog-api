@@ -38,6 +38,7 @@ func allowedRoles() map[string][]string {
 
 	return map[string][]string{
 		"UploadAvatar":                         {"admin", "author", "user"},
+		"UploadPostImage":                      {"admin", "author"},
 		blogBasePath + "Register":              {"any"},
 		blogBasePath + "Login":                 {"any"},
 		blogBasePath + "AutoLogin":             {"any"},
@@ -62,7 +63,7 @@ func allowedRoles() map[string][]string {
 		blogBasePath + "FollowUser":            {"admin", "author", "user"},
 		blogBasePath + "ListFollows":           {"admin", "author", "user"},
 		blogBasePath + "CreatePost":            {"admin", "author"},
-		blogBasePath + "DeletePosts":           {"admin", "author"},
+		blogBasePath + "DeletePost":            {"admin", "author"},
 		blogBasePath + "UpdatePost":            {"admin", "author"},
 		blogBasePath + "SubmitPost":            {"admin", "author"},
 		blogBasePath + "PublishPost":           {"admin"},

@@ -39,6 +39,7 @@ func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessions
 		Ids:    ids,
 		UserID: authUser.ID,
 	}
+
 	nrows, err := server.store.DeleteSessions(ctx, arg)
 	if err != nil || int64(len(ids)) != nrows {
 		return nil, status.Error(codes.Internal, "failed to delete sessions")
@@ -50,8 +51,7 @@ func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessions
 // -------------------------------------------------------------------
 // DeleteExpiredSessions
 func (server *Server) DeleteExpiredSessions(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
-	err := server.store.DeleteExpiredSessions(ctx)
-	if err != nil {
+	if err := server.store.DeleteExpiredSessions(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete expired sessions: %s", err.Error())
 	}
 	return &emptypb.Empty{}, nil
@@ -87,6 +87,5 @@ func (server *Server) ListSessions(ctx context.Context, req *pb.ListSessionsRequ
 		return nil, status.Error(codes.Internal, "failed to get sessions")
 	}
 
-	rsp := convertListSessions(sessions)
-	return rsp, nil
+	return convertListSessions(sessions), nil
 }

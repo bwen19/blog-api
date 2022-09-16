@@ -92,6 +92,7 @@ func (server *Server) UploadAvatar(w http.ResponseWriter, r *http.Request, authU
 		ID:     authUser.ID,
 		Avatar: sql.NullString{String: avatar, Valid: true},
 	}
+
 	user, err := server.store.UpdateUser(r.Context(), arg)
 	if err != nil {
 		writeHttpError(w, NewHttpError(codes.Internal, "failed to update user avatar in db"))

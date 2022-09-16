@@ -392,7 +392,7 @@ Tag_CTE AS (
       array_agg(t.name)::varchar[] tag_names
   FROM post_tags pt
   JOIN tags t
-    ON pt.category_id = t.id
+    ON pt.tag_id = t.id
     AND pt.post_id = ANY(SELECT id FROM Post_CTE)
   GROUP BY pt.post_id
 )
@@ -641,9 +641,12 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (Post, e
 const updatePostContent = `-- name: UpdatePostContent :one
 UPDATE post_contents
 SET content = $2
-WHERE id = $1 AND author_id = $3::bigint
-  AND status = ANY('{draft, revise}'::varchar[])
-RETURNING id, content
+WHERE id = (
+  SELECT p.id FROM posts p
+  WHERE p.id = $1
+    AND author_id = $3::bigint
+    AND status = ANY('{draft, revise}'::varchar[])
+) RETURNING id, content
 `
 
 type UpdatePostContentParams struct {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/bwen19/blog/grpc/pb"
 	"github.com/bwen19/blog/psql/db"
@@ -47,6 +48,7 @@ func (server *Server) DeleteTags(ctx context.Context, req *pb.DeleteTagsRequest)
 	if err != nil || int64(len(tagIDs)) != nrows {
 		return nil, status.Error(codes.Internal, "failed to delete tags")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -103,12 +105,29 @@ func (server *Server) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*p
 		return nil, status.Error(codes.Internal, "failed to list tags")
 	}
 
-	rsp := convertListTags(tags)
-	return rsp, nil
+	return convertListTags(tags), nil
 }
 
 // -------------------------------------------------------------------
 // GetTag
-func (server *Server) GetTag(context.Context, *pb.GetTagRequest) (*pb.GetTagResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTag not implemented")
+func (server *Server) GetTag(ctx context.Context, req *pb.GetTagRequest) (*pb.GetTagResponse, error) {
+	if err := util.ValidateString(req.GetTagName(), 1, 50); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "tagName: %s", err.Error())
+	}
+
+	var tag db.Tag
+	tag, err := server.store.GetTagsByName(ctx, req.GetTagName())
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, status.Error(codes.Internal, "failed to get tag")
+		}
+
+		tag, err = server.store.CreateTag(ctx, req.GetTagName())
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to create new tag")
+		}
+	}
+
+	rsp := &pb.GetTagResponse{Tag: convertTag(tag)}
+	return rsp, nil
 }

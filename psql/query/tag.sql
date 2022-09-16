@@ -30,8 +30,9 @@ ORDER BY
 LIMIT $1
 OFFSET $2;
 
--- name: GetTagsByNames :many
-SELECT * FROM tags WHERE name = ANY(@name::varchar[]);
+-- name: GetTagsByName :one
+SELECT * FROM tags
+WHERE name = @name::varchar LIMIT 1;
 
 -- name: CreatePostTags :many
 WITH Tag_CTE AS (

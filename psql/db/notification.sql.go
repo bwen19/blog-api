@@ -12,17 +12,6 @@ import (
 	"github.com/lib/pq"
 )
 
-const checkMessage = `-- name: CheckMessage :exec
-UPDATE notifications
-SET unread = false
-WHERE id = ANY($1::bigint[])
-`
-
-func (q *Queries) CheckMessage(ctx context.Context, ids []int64) error {
-	_, err := q.db.ExecContext(ctx, checkMessage, pq.Array(ids))
-	return err
-}
-
 const createNotification = `-- name: CreateNotification :exec
 INSERT INTO notifications (user_id, kind, title, content)
 VALUES ($1, $2, $3, $4)
@@ -83,7 +72,9 @@ WITH Data_CTE AS (
   FROM notifications WHERE kind = 'admin'
 ),
 Count_CTE AS (
-  SELECT count(*) total FROM Data_CTE
+  SELECT count(*) total,
+    count(*) filter(WHERE unread = true) unread_count
+  FROM Data_CTE
 )
 SELECT dc.id, dc.user_id, dc.kind, dc.title, dc.content, dc.unread, dc.create_at, cc.total, u.username, u.email, u.avatar
 FROM Data_CTE dc
@@ -155,29 +146,18 @@ WITH Data_CTE AS (
   WHERE user_id = $3::bigint AND kind = $4::varchar
 ),
 Count_CTE AS (
-  SELECT count(*) filter(WHERE unread = true) unread_count,
-    count(*) total
+  SELECT count(*) total,
+    count(*) filter(WHERE unread = true) unread_count,
+    count(*) filter(WHERE unread = true AND kind = 'system') system_count,
+    count(*) filter(WHERE unread = true AND kind = 'reply') reply_count
   FROM Data_CTE
-),
-Notifs_CTE AS (
-  SELECT id, kind, title, content, unread, create_at FROM Data_CTE
-  ORDER BY create_at DESC
-  LIMIT $1
-  OFFSET $2
-),
-Read_CTE AS (
-  UPDATE notifications
-  SET unread = false
-  WHERE id = ANY(SELECT id FROM Notifs_CTE) AND unread = true
-  RETURNING id
-),
-ReadCount_CTE AS (
-  SELECT count(*) read_count FROM Read_CTE
 )
-SELECT nc.id, nc.kind, nc.title, nc.content, nc.unread, nc.create_at, (cc.unread_count - rc.read_count)::bigint unread_count, cc.total
-FROM Notifs_CTE nc
-CROSS JOIN Count_CTE cc
-CROSS JOIN ReadCount_CTE rc
+SELECT dc.id, dc.kind, dc.title, dc.content, dc.unread, dc.create_at, cnt.total, cnt.unread_count, cnt.system_count, cnt.reply_count
+FROM Data_CTE dc
+CROSS JOIN Count_CTE cnt
+ORDER BY create_at DESC
+LIMIT $1
+OFFSET $2
 `
 
 type ListNotificationsParams struct {
@@ -194,8 +174,10 @@ type ListNotificationsRow struct {
 	Content     string    `json:"content"`
 	Unread      bool      `json:"unread"`
 	CreateAt    time.Time `json:"create_at"`
-	UnreadCount int64     `json:"unread_count"`
 	Total       int64     `json:"total"`
+	UnreadCount int64     `json:"unread_count"`
+	SystemCount int64     `json:"system_count"`
+	ReplyCount  int64     `json:"reply_count"`
 }
 
 func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]ListNotificationsRow, error) {
@@ -219,8 +201,10 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 			&i.Content,
 			&i.Unread,
 			&i.CreateAt,
-			&i.UnreadCount,
 			&i.Total,
+			&i.UnreadCount,
+			&i.SystemCount,
+			&i.ReplyCount,
 		); err != nil {
 			return nil, err
 		}
@@ -245,4 +229,22 @@ WHERE user_id = $1::bigint
 func (q *Queries) MarkAllRead(ctx context.Context, userID int64) error {
 	_, err := q.db.ExecContext(ctx, markAllRead, userID)
 	return err
+}
+
+const markNotifications = `-- name: MarkNotifications :execrows
+UPDATE notifications SET unread = $1::bool
+WHERE id = ANY($2::bigint[])
+`
+
+type MarkNotificationsParams struct {
+	Unread bool    `json:"unread"`
+	Ids    []int64 `json:"ids"`
+}
+
+func (q *Queries) MarkNotifications(ctx context.Context, arg MarkNotificationsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markNotifications, arg.Unread, pq.Array(arg.Ids))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

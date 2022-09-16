@@ -28,11 +28,11 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 	}
 
 	if req.GetLike() {
-		arg1 := db.CreateFollowParams{
+		arg := db.CreateFollowParams{
 			UserID:     userID,
 			FollowerID: authUser.ID,
 		}
-		err := server.store.CreateFollow(ctx, arg1)
+		err := server.store.CreateFollow(ctx, arg)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to create follow")
 		}
@@ -50,7 +50,7 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 }
 
 // -------------------------------------------------------------------
-// ListFollowers
+// ListFollows
 func (server *Server) ListFollows(ctx context.Context, req *pb.ListFollowsRequest) (*pb.ListFollowsResponse, error) {
 	if err := util.ValidatePage(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

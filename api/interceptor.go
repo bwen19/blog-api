@@ -116,5 +116,6 @@ func (server *Server) authFunc(ctx context.Context, method string) (context.Cont
 			return newCtx, nil
 		}
 	}
+
 	return ctx, status.Error(codes.PermissionDenied, "no permission to access")
 }
