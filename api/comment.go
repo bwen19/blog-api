@@ -50,9 +50,8 @@ func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRe
 		Content: comment.Content,
 	}
 
-	err = server.store.CreateNotification(ctx, arg2)
-	if err != nil {
-		log.Println("failed to create new notification for withdrawing post")
+	if err = server.store.CreateNotification(ctx, arg2); err != nil {
+		log.Println("failed to create new notification for post comment")
 	}
 
 	rsp := convertCreateComment(comment, authUser.User)
@@ -101,10 +100,11 @@ func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRe
 		IsAdmin: authUser.Role == "admin",
 		UserID:  authUser.ID,
 	}
-	err := server.store.DeleteComment(ctx, arg)
-	if err != nil {
+
+	if err := server.store.DeleteComment(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete comment")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -141,8 +141,7 @@ func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequ
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
 
-	rsp := convertListComments(comments)
-	return rsp, nil
+	return convertListComments(comments), nil
 }
 
 // -------------------------------------------------------------------
@@ -178,8 +177,7 @@ func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesReques
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
 
-	rsp := convertListReplies(replies)
-	return rsp, nil
+	return convertListReplies(replies), nil
 }
 
 // -------------------------------------------------------------------
@@ -200,8 +198,7 @@ func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentReques
 			CommentID: commentID,
 			UserID:    authUser.ID,
 		}
-		err := server.store.CreateCommentStar(ctx, arg)
-		if err != nil {
+		if err := server.store.CreateCommentStar(ctx, arg); err != nil {
 			return nil, status.Error(codes.Internal, "failed to create comment star")
 		}
 	} else {
@@ -209,10 +206,10 @@ func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentReques
 			CommentID: commentID,
 			UserID:    authUser.ID,
 		}
-		err := server.store.DeleteCommentStar(ctx, arg)
-		if err != nil {
+		if err := server.store.DeleteCommentStar(ctx, arg); err != nil {
 			return nil, status.Error(codes.Internal, "failed to delete comment star")
 		}
 	}
+
 	return &emptypb.Empty{}, nil
 }

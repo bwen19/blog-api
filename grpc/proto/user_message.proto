@@ -32,7 +32,7 @@ message ListUsersRequest {
     int32 page_size = 2;
     string order = 3;
     string order_by = 4;
-    string keyword = 5;
+    optional string keyword = 5;
 }
 message ListUsersResponse {
     message UserItem {

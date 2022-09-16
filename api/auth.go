@@ -194,9 +194,7 @@ func (server *Server) Refresh(ctx context.Context, req *pb.RefreshTokenRequest) 
 		return nil, status.Error(codes.Internal, "failed to create access token")
 	}
 
-	rsp := &pb.RefreshTokenResponse{
-		AccessToken: accessToken,
-	}
+	rsp := &pb.RefreshTokenResponse{AccessToken: accessToken}
 	return rsp, nil
 }
 

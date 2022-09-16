@@ -15,12 +15,11 @@ import (
 // -------------------------------------------------------------------
 // CreateCategory
 func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategoryRequest) (*pb.CreateCategoryResponse, error) {
-	name := req.GetName()
-	if err := util.ValidateString(name, 1, 50); err != nil {
+	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
 	}
 
-	category, err := server.store.CreateCategory(ctx, name)
+	category, err := server.store.CreateCategory(ctx, req.GetName())
 	if err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			switch pgErr.Code.Name() {
@@ -47,6 +46,7 @@ func (server *Server) DeleteCategories(ctx context.Context, req *pb.DeleteCatego
 	if err != nil || int64(len(categoryIDs)) != nrows {
 		return nil, status.Error(codes.Internal, "failed to delete categories")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -99,12 +99,17 @@ func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategories
 		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
 
-	rsp := convertListCategories(categories)
-	return rsp, nil
+	return convertListCategories(categories), nil
 }
 
 // -------------------------------------------------------------------
 // GetCategories
-func (server *Server) GetCategories(context.Context, *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetCategories not implemented")
+func (server *Server) GetCategories(ctx context.Context, req *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
+	categories, err := server.store.GetCategories(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get categories")
+	}
+
+	rsp := &pb.GetCategoriesResponse{Categories: convertCategories(categories)}
+	return rsp, nil
 }

@@ -33,7 +33,9 @@ message ListNotifsRequest {
 message ListNotifsResponse {
     int64 total = 1;
     int64 unread_count = 2;
-    repeated Notification notifications = 3;
+    int64 system_count = 3;
+    int64 reply_count = 4;
+    repeated Notification notifications = 5;
 }
 
 message ListMessagesRequest {
@@ -51,7 +53,8 @@ message ListMessagesResponse {
         google.protobuf.Timestamp create_at = 7;
     }
     int64 total = 1;
-    repeated MessageItem messages = 2;
+    int64 unread_count = 2;
+    repeated MessageItem messages = 3;
 }
 
 message CheckMessagesRequest {

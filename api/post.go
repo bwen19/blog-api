@@ -55,6 +55,7 @@ func (server *Server) DeletePost(ctx context.Context, req *pb.DeletePostRequest)
 		ID:       req.PostId,
 		AuthorID: authUser.ID,
 	}
+
 	if err := server.store.DeletePost(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete posts")
 	}
@@ -193,8 +194,7 @@ func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest)
 			Content: fmt.Sprintf("Post entitled \"%s\" has been submitted", post.Title),
 		}
 
-		err = server.store.CreateNotification(ctx, arg)
-		if err != nil {
+		if err = server.store.CreateNotification(ctx, arg); err != nil {
 			log.Println("failed to create new notification for submitting post")
 		}
 	}
@@ -202,6 +202,7 @@ func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest)
 	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some submissions failed")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -219,6 +220,7 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 		OldStatus: []string{"review"},
 		IsAdmin:   true,
 	}
+
 	newPosts, err := server.store.UpdatePostStatus(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to publish posts")
@@ -232,8 +234,7 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 			Content: fmt.Sprintf("Congratulations! Post entitled \"%s\" has been published", post.Title),
 		}
 
-		err = server.store.CreateNotification(ctx, arg)
-		if err != nil {
+		if err = server.store.CreateNotification(ctx, arg); err != nil {
 			log.Println("failed to create new notification for publishing post")
 		}
 	}
@@ -241,6 +242,7 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some publications failed")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -258,6 +260,7 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 		OldStatus: []string{"publish", "review"},
 		IsAdmin:   true,
 	}
+
 	withdrawPosts, err := server.store.UpdatePostStatus(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to withdraw posts")
@@ -271,8 +274,7 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 			Content: fmt.Sprintf("Post \"%s\" has been withdrawn", post.Title),
 		}
 
-		err = server.store.CreateNotification(ctx, arg)
-		if err != nil {
+		if err = server.store.CreateNotification(ctx, arg); err != nil {
 			log.Println("failed to create new notification for withdrawing post")
 		}
 	}
@@ -280,6 +282,7 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 	if len(withdrawPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some withdrawal failed")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -511,22 +514,21 @@ func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*p
 		authUser = user
 	}
 
-	postID := req.GetPostId()
-	if err := util.ValidateID(postID); err != nil {
+	if err := util.ValidateID(req.GetPostId()); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
 	}
 
 	arg := db.ReadPostParams{
-		PostID: postID,
+		PostID: req.GetPostId(),
 		SelfID: authUser.ID,
 	}
+
 	post, err := server.store.ReadPost(ctx, arg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to read post")
 	}
 
-	rsp := convertReadPost(post)
-	return rsp, nil
+	return convertReadPost(post), nil
 }
 
 // -------------------------------------------------------------------
@@ -547,8 +549,7 @@ func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*e
 			PostID: postID,
 			UserID: authUser.ID,
 		}
-		err := server.store.CreatePostStar(ctx, arg)
-		if err != nil {
+		if err := server.store.CreatePostStar(ctx, arg); err != nil {
 			return nil, status.Error(codes.Internal, "failed to create post star")
 		}
 	} else {
@@ -556,10 +557,10 @@ func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*e
 			PostID: postID,
 			UserID: authUser.ID,
 		}
-		err := server.store.DeletePostStar(ctx, arg)
-		if err != nil {
+		if err := server.store.DeletePostStar(ctx, arg); err != nil {
 			return nil, status.Error(codes.Internal, "failed to delete post star")
 		}
 	}
+
 	return &emptypb.Empty{}, nil
 }

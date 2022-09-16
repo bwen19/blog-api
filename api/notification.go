@@ -19,8 +19,7 @@ func (server *Server) MarkAllRead(ctx context.Context, req *emptypb.Empty) (*emp
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	err := server.store.MarkAllRead(ctx, authUser.ID)
-	if err != nil {
+	if err := server.store.MarkAllRead(ctx, authUser.ID); err != nil {
 		return nil, status.Error(codes.Internal, "failed to mark all notifications as read")
 	}
 
@@ -35,25 +34,24 @@ func (server *Server) LeaveMessage(ctx context.Context, req *pb.LeaveMessageRequ
 		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
-	title := req.GetTitle()
-	if title == "" {
+	if req.GetTitle() == "" {
 		return nil, status.Error(codes.InvalidArgument, "title should not be empty")
 	}
-	content := req.GetContent()
-	if title == "" {
+
+	if req.GetContent() == "" {
 		return nil, status.Error(codes.InvalidArgument, "content should not be empty")
 	}
 
 	arg := db.CreateNotificationParams{
 		UserID:  authUser.ID,
 		Kind:    "admin",
-		Title:   title,
-		Content: content,
+		Title:   req.GetTitle(),
+		Content: req.GetContent(),
 	}
-	err := server.store.CreateNotification(ctx, arg)
-	if err != nil {
+	if err := server.store.CreateNotification(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to leave message to admin")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -90,7 +88,8 @@ func (server *Server) ListNotifs(ctx context.Context, req *pb.ListNotifsRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if err := util.ValidateOneOf(req.GetKind(), []string{"system", "reply", "private"}); err != nil {
+	options := []string{"system", "reply"}
+	if err := util.ValidateOneOf(req.GetKind(), options); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "kind: %s", err.Error())
 	}
 
@@ -111,8 +110,21 @@ func (server *Server) ListNotifs(ctx context.Context, req *pb.ListNotifsRequest)
 		return nil, status.Error(codes.Internal, "failed to get notifications")
 	}
 
-	rsp := convertListNotifs(notifs)
-	return rsp, nil
+	notifIDs := []int64{}
+	for _, notif := range notifs {
+		notifIDs = append(notifIDs, notif.ID)
+	}
+
+	mArg := db.MarkNotificationsParams{
+		Ids:    notifIDs,
+		Unread: false,
+	}
+	nrows, err := server.store.MarkNotifications(ctx, mArg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to mark notifications")
+	}
+
+	return convertListNotifs(notifs, nrows), nil
 }
 
 // -------------------------------------------------------------------
@@ -132,8 +144,7 @@ func (server *Server) ListMessages(ctx context.Context, req *pb.ListMessagesRequ
 		return nil, status.Error(codes.Internal, "failed to get notifications")
 	}
 
-	rsp := convertLisMessages(messages)
-	return rsp, nil
+	return convertLisMessages(messages), nil
 }
 
 // -------------------------------------------------------------------
@@ -144,8 +155,14 @@ func (server *Server) CheckMessages(ctx context.Context, req *pb.CheckMessagesRe
 		return nil, status.Errorf(codes.InvalidArgument, "messageId: %s", err.Error())
 	}
 
-	if err = server.store.CheckMessage(ctx, messageIDs); err != nil {
+	arg := db.MarkNotificationsParams{
+		Unread: req.GetCheck(),
+		Ids:    messageIDs,
+	}
+
+	if _, err = server.store.MarkNotifications(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to check messages")
 	}
+
 	return &emptypb.Empty{}, nil
 }

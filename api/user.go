@@ -91,6 +91,7 @@ func (server *Server) DeleteUsers(ctx context.Context, req *pb.DeleteUsersReques
 	if err != nil || int64(len(userIDs)) != nrows {
 		return nil, status.Error(codes.Internal, "failed to delete user")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -125,6 +126,7 @@ func (server *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		}
 		return nil, status.Error(codes.Internal, "failed to update user")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -168,6 +170,12 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	if req.Keyword != nil {
+		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "keyword: %s", err.Error())
+		}
+	}
+
 	arg := db.ListUsersParams{
 		Limit:        req.GetPageSize(),
 		Offset:       (req.GetPageId() - 1) * req.GetPageSize(),
@@ -179,7 +187,7 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		DeletedDesc:  req.GetOrderBy() == "isDeleted" && req.GetOrder() == "desc",
 		CreateAtAsc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
 		CreateAtDesc: req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
-		AnyKeyword:   req.GetKeyword() == "",
+		AnyKeyword:   req.Keyword == nil,
 		Keyword:      "%" + req.GetKeyword() + "%",
 	}
 
@@ -188,8 +196,7 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		return nil, status.Error(codes.Internal, "failed to list users")
 	}
 
-	rsp := convertListUsers(users)
-	return rsp, nil
+	return convertListUsers(users), nil
 }
 
 // -------------------------------------------------------------------
@@ -282,6 +289,7 @@ func (server *Server) ChangePassword(ctx context.Context, req *pb.ChangePassword
 	if _, err = server.store.UpdateUser(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to change password")
 	}
+
 	return &emptypb.Empty{}, nil
 }
 
@@ -317,6 +325,7 @@ func (server *Server) GetUserProfile(ctx context.Context, req *pb.GetUserProfile
 		UserID: req.GetUserId(),
 		SelfID: authUser.ID,
 	}
+
 	user, err := server.store.GetUserProfile(ctx, arg)
 	if err != nil {
 		if err == sql.ErrNoRows {

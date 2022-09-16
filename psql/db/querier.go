@@ -11,7 +11,6 @@ import (
 )
 
 type Querier interface {
-	CheckMessage(ctx context.Context, ids []int64) error
 	CreateCategory(ctx context.Context, name string) (Category, error)
 	CreateComment(ctx context.Context, arg CreateCommentParams) (CreateCommentRow, error)
 	CreateCommentStar(ctx context.Context, arg CreateCommentStarParams) error
@@ -45,7 +44,7 @@ type Querier interface {
 	GetPostTags(ctx context.Context, postID int64) ([]Tag, error)
 	GetPosts(ctx context.Context, arg GetPostsParams) ([]GetPostsRow, error)
 	GetSession(ctx context.Context, id uuid.UUID) (Session, error)
-	GetTagsByNames(ctx context.Context, name []string) ([]Tag, error)
+	GetTagsByName(ctx context.Context, name string) (Tag, error)
 	GetUnreadCount(ctx context.Context, userID int64) (int64, error)
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -63,6 +62,7 @@ type Querier interface {
 	ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error)
 	MarkAllRead(ctx context.Context, userID int64) error
+	MarkNotifications(ctx context.Context, arg MarkNotificationsParams) (int64, error)
 	ReadPost(ctx context.Context, arg ReadPostParams) (ReadPostRow, error)
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdatePost(ctx context.Context, arg UpdatePostParams) (Post, error)

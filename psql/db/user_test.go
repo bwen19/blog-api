@@ -21,7 +21,7 @@ func createRandomUser(t *testing.T) User {
 		Role:           "user",
 	}
 
-	user, err := testQueries.CreateUser(context.Background(), arg)
+	user, err := testStore.CreateUser(context.Background(), arg)
 	require.NoError(t, err)
 	require.NotEmpty(t, user)
 
@@ -42,12 +42,46 @@ func TestDeleteUsers(t *testing.T) {
 	user1 := createRandomUser(t)
 	userIDs := []int64{user1.ID}
 
-	nrows, err := testQueries.DeleteUsers(context.Background(), userIDs)
+	nrows, err := testStore.DeleteUsers(context.Background(), userIDs)
 	require.NoError(t, err)
 	require.Equal(t, int64(len(userIDs)), nrows)
 
-	user2, err := testQueries.GetUser(context.Background(), user1.ID)
+	user2, err := testStore.GetUser(context.Background(), user1.ID)
 	require.Error(t, err)
 	require.EqualError(t, err, sql.ErrNoRows.Error())
 	require.Empty(t, user2)
+}
+
+func TestListUsers(t *testing.T) {
+	for i := 0; i < 5; i++ {
+		createRandomUser(t)
+	}
+
+	arg := ListUsersParams{
+		Limit:        5,
+		Offset:       0,
+		CreateAtDesc: true,
+		AnyKeyword:   true,
+	}
+
+	users, err := testStore.ListUsers(context.Background(), arg)
+	require.NoError(t, err)
+	require.NotEmpty(t, users)
+
+	require.Equal(t, len(users), 5)
+}
+
+func TestGetUserProfile(t *testing.T) {
+	user := createRandomUser(t)
+
+	arg := GetUserProfileParams{
+		UserID: user.ID,
+		SelfID: 0,
+	}
+	userP, err := testStore.GetUserProfile(context.Background(), arg)
+	require.NoError(t, err)
+	require.NotEmpty(t, userP)
+
+	require.Equal(t, user.ID, userP.ID)
+	require.Equal(t, user.Username, userP.Username)
 }

@@ -66,7 +66,7 @@ func convertListSessions(sessions []db.ListSessionsRow) *pb.ListSessionsResponse
 	}
 }
 
-func convertListNotifs(notifs []db.ListNotificationsRow) *pb.ListNotifsResponse {
+func convertListNotifs(notifs []db.ListNotificationsRow, nReads int64) *pb.ListNotifsResponse {
 	if len(notifs) == 0 {
 		return &pb.ListNotifsResponse{}
 	}
@@ -86,7 +86,9 @@ func convertListNotifs(notifs []db.ListNotificationsRow) *pb.ListNotifsResponse 
 
 	return &pb.ListNotifsResponse{
 		Total:         notifs[0].Total,
-		UnreadCount:   notifs[0].UnreadCount,
+		UnreadCount:   notifs[0].UnreadCount - nReads,
+		SystemCount:   notifs[0].SystemCount,
+		ReplyCount:    notifs[0].ReplyCount,
 		Notifications: rspNotifs,
 	}
 }
@@ -176,11 +178,11 @@ func convertCategory(category db.Category) *pb.Category {
 }
 
 func convertCategories(categories []db.Category) []*pb.Category {
-	rsp := []*pb.Category{}
+	rspCategories := make([]*pb.Category, 0, 2)
 	for _, category := range categories {
-		rsp = append(rsp, convertCategory(category))
+		rspCategories = append(rspCategories, convertCategory(category))
 	}
-	return rsp
+	return rspCategories
 }
 
 func convertListCategories(categories []db.ListCategoriesRow) *pb.ListCategoriesResponse {
@@ -206,11 +208,11 @@ func convertTag(tag db.Tag) *pb.Tag {
 }
 
 func convertTags(tags []db.Tag) []*pb.Tag {
-	rsp := []*pb.Tag{}
+	rspTags := make([]*pb.Tag, 0, 5)
 	for _, tag := range tags {
-		rsp = append(rsp, convertTag(tag))
+		rspTags = append(rspTags, convertTag(tag))
 	}
-	return rsp
+	return rspTags
 }
 
 func convertListTags(tags []db.ListTagsRow) *pb.ListTagsResponse {
@@ -218,7 +220,7 @@ func convertListTags(tags []db.ListTagsRow) *pb.ListTagsResponse {
 		return &pb.ListTagsResponse{}
 	}
 
-	rspTags := []*pb.ListTagsResponse_TagItem{}
+	rspTags := make([]*pb.ListTagsResponse_TagItem, 0, 5)
 	for _, tag := range tags {
 		pbTag := &pb.ListTagsResponse_TagItem{
 			Id:        tag.ID,
@@ -227,6 +229,7 @@ func convertListTags(tags []db.ListTagsRow) *pb.ListTagsResponse {
 		}
 		rspTags = append(rspTags, pbTag)
 	}
+
 	return &pb.ListTagsResponse{
 		Total: tags[0].Total,
 		Tags:  rspTags,
@@ -304,6 +307,7 @@ func convertListPosts(posts []db.ListPostsRow) *pb.ListPostsResponse {
 		}
 		rspPosts = append(rspPosts, pbPost)
 	}
+
 	return &pb.ListPostsResponse{
 		Total: posts[0].Total,
 		Posts: rspPosts,
@@ -402,7 +406,7 @@ func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 		Followed:       post.Followed.Valid,
 	}
 
-	categories := []*pb.Category{}
+	categories := make([]*pb.Category, 0, 2)
 	for i := 0; i < len(post.CategoryIds); i++ {
 		category := &pb.Category{
 			Id:   post.CategoryIds[i],
@@ -411,7 +415,7 @@ func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 		categories = append(categories, category)
 	}
 
-	tags := []*pb.Tag{}
+	tags := make([]*pb.Tag, 0, 5)
 	for i := 0; i < len(post.TagIds); i++ {
 		tag := &pb.Tag{
 			Id:   post.TagIds[i],

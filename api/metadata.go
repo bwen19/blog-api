@@ -27,9 +27,7 @@ func (server *Server) extractMetadata(ctx context.Context) *Metadata {
 		if userAgents := md.Get(grpcGatewayUserAgentHeader); len(userAgents) > 0 {
 			mtdt.UserAgent = userAgents[0]
 		}
-		// if userAgents := md.Get(userAgentHeader); len(userAgents) > 0 {
-		// 	mtdt.UserAgent = userAgents[0]
-		// }
+
 		if clientIPs := md.Get(xForwardedForHeader); len(clientIPs) > 0 {
 			mtdt.ClientIp = clientIPs[0]
 		}

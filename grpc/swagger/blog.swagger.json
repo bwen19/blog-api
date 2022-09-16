@@ -2594,6 +2594,10 @@
           "type": "string",
           "format": "int64"
         },
+        "unreadCount": {
+          "type": "string",
+          "format": "int64"
+        },
         "messages": {
           "type": "array",
           "items": {
@@ -2610,6 +2614,14 @@
           "format": "int64"
         },
         "unreadCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "systemCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "replyCount": {
           "type": "string",
           "format": "int64"
         },
