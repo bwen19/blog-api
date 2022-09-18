@@ -32,6 +32,19 @@ func RandomEmail() string {
 	return fmt.Sprintf("%s@email.com", RandomString(6))
 }
 
-func RandomImageName(ID int64) string {
-	return fmt.Sprintf("img-%d-%s-%d", ID, RandomString(6), time.Now().Unix())
+const alphanumeric = "abcdefghijklmnopqrstuvwxyz1234567890"
+
+func RandomNumString(n int) string {
+	var sb strings.Builder
+	k := len(alphanumeric)
+
+	for i := 0; i < n; i++ {
+		c := alphanumeric[rand.Intn(k)]
+		sb.WriteByte(c)
+	}
+	return sb.String()
+}
+
+func RandomImageName() string {
+	return fmt.Sprintf("img-%d-%s", time.Now().UnixNano()/1e6, RandomNumString(12))
 }

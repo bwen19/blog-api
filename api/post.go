@@ -25,7 +25,6 @@ func (server *Server) CreatePost(ctx context.Context, req *emptypb.Empty) (*pb.C
 	arg := db.CreateNewPostParams{
 		AuthorID:   authUser.ID,
 		Title:      "",
-		Abstract:   "",
 		CoverImage: server.config.DefaultCover,
 		Content:    "",
 	}
@@ -57,7 +56,7 @@ func (server *Server) DeletePost(ctx context.Context, req *pb.DeletePostRequest)
 	}
 
 	if err := server.store.DeletePost(ctx, arg); err != nil {
-		return nil, status.Error(codes.Internal, "failed to delete posts")
+		return nil, status.Error(codes.Internal, "failed to delete post")
 	}
 
 	return &emptypb.Empty{}, nil
@@ -79,7 +78,6 @@ func (server *Server) UpdatePost(ctx context.Context, req *pb.UpdatePostRequest)
 		ID:         req.GetPostId(),
 		AuthorID:   authUser.ID,
 		Title:      sql.NullString{String: req.GetTitle(), Valid: req.Title != nil},
-		Abstract:   sql.NullString{String: req.GetAbstract(), Valid: req.Abstract != nil},
 		CoverImage: sql.NullString{String: req.GetCoverImage(), Valid: req.CoverImage != nil},
 	}
 
@@ -142,12 +140,6 @@ func validateUpdatePostRequest(req *pb.UpdatePostRequest) error {
 	if req.Title != nil {
 		if err := util.ValidateString(req.GetTitle(), 1, 200); err != nil {
 			return fmt.Errorf("title: %s", err.Error())
-		}
-	}
-
-	if req.Abstract != nil {
-		if err := util.ValidateString(req.GetAbstract(), 1, 1000); err != nil {
-			return fmt.Errorf("abstract: %s", err.Error())
 		}
 	}
 
@@ -435,14 +427,24 @@ func (server *Server) GetPost(ctx context.Context, req *pb.GetPostRequest) (*pb.
 
 // -------------------------------------------------------------------
 // GetPosts
+func (server *Server) GetFeaturedPosts(ctx context.Context, req *pb.GetFeaturedPostsRequest) (*pb.GetFeaturedPostsResponse, error) {
+	if err := util.ValidateNumber(int64(req.GetNum()), 1, 8); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "num: %s", err.Error())
+	}
+
+	posts, err := server.store.GetFeaturedPosts(ctx, req.GetNum())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get featured posts")
+	}
+
+	return convertFeaturedPosts(posts), nil
+}
+
+// -------------------------------------------------------------------
+// GetPosts
 func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*pb.GetPostsResponse, error) {
 	if err := validateGetPostsRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
 	}
 
 	arg := db.GetPostsParams{
@@ -452,7 +454,6 @@ func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*p
 		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
 		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
 		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
-		SelfID:        authUser.ID,
 		AnyFeatured:   req.Featured == nil,
 		Featured:      req.GetFeatured(),
 		AnyAuthor:     req.AuthorId == nil,

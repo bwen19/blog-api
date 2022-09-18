@@ -15,7 +15,6 @@ func createRandomPost(t *testing.T) CreateNewPostRow {
 	arg := CreateNewPostParams{
 		AuthorID:   user.ID,
 		Title:      util.RandomString(10),
-		Abstract:   util.RandomString(30),
 		CoverImage: util.RandomString(20),
 		Content:    util.RandomString(100),
 	}
@@ -26,7 +25,6 @@ func createRandomPost(t *testing.T) CreateNewPostRow {
 
 	require.Equal(t, arg.AuthorID, post.AuthorID)
 	require.Equal(t, arg.Title, post.Title)
-	require.Equal(t, arg.Abstract, post.Abstract)
 	require.Equal(t, arg.CoverImage, post.CoverImage)
 	require.Equal(t, arg.Content, post.Content)
 	require.Equal(t, "draft", post.Status)

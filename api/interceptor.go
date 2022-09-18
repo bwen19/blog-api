@@ -77,9 +77,13 @@ func (server *Server) authFunc(ctx context.Context, method string) (context.Cont
 		return ctx, status.Errorf(codes.Unimplemented, "method %s not implemented", method)
 	}
 
+	if len(allowedRoles) == 1 && allowedRoles[0] == "any" {
+		return ctx, nil
+	}
+
 	accessToken, err := server.extractTokenFromMeta(ctx)
 	if err != nil {
-		if allowedRoles[0] == "any" {
+		if allowedRoles[0] == "anonymous" {
 			return ctx, nil
 		}
 		return ctx, status.Error(codes.Unauthenticated, err.Error())

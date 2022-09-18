@@ -16,11 +16,6 @@ message Notification {
     google.protobuf.Timestamp create_at = 6;
 }
 
-message LeaveMessageRequest {
-    string title = 1;
-    string content = 2;
-}
-
 message DeleteNotifsRequest {
     repeated int64 notification_ids = 1;
 }
@@ -36,6 +31,11 @@ message ListNotifsResponse {
     int64 system_count = 3;
     int64 reply_count = 4;
     repeated Notification notifications = 5;
+}
+
+message LeaveMessageRequest {
+    string title = 1;
+    string content = 2;
 }
 
 message ListMessagesRequest {
@@ -60,4 +60,8 @@ message ListMessagesResponse {
 message CheckMessagesRequest {
     repeated int64 message_ids = 1;
     bool check = 2;
+}
+
+message DeleteMessagesRequest {
+    repeated int64 message_ids = 1;
 }

@@ -165,7 +165,7 @@ func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
 // -------------------------------------------------------------------
 // ListUsers
 func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
-	options := []string{"username", "role", "isDeleted", "createAt"}
+	options := []string{"username", "role", "deleted", "createAt"}
 	if err := util.ValidatePageOrder(req, options); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -183,8 +183,8 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		UsernameDesc: req.GetOrderBy() == "username" && req.GetOrder() == "desc",
 		RoleAsc:      req.GetOrderBy() == "role" && req.GetOrder() == "asc",
 		RoleDesc:     req.GetOrderBy() == "role" && req.GetOrder() == "desc",
-		DeletedAsc:   req.GetOrderBy() == "isDeleted" && req.GetOrder() == "asc",
-		DeletedDesc:  req.GetOrderBy() == "isDeleted" && req.GetOrder() == "desc",
+		DeletedAsc:   req.GetOrderBy() == "deleted" && req.GetOrder() == "asc",
+		DeletedDesc:  req.GetOrderBy() == "deleted" && req.GetOrder() == "desc",
 		CreateAtAsc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
 		CreateAtDesc: req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 		AnyKeyword:   req.Keyword == nil,

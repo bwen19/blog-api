@@ -48,7 +48,7 @@ func (server *Server) HandleFileUpload(w http.ResponseWriter, r *http.Request, p
 	case "UploadAvatar":
 		server.UploadAvatar(w, r, authUser)
 	case "UploadPostImage":
-		server.UploadPostImage(w, r, authUser)
+		server.UploadPostImage(w, r)
 	default:
 		writeHttpError(w, NewHttpError(codes.Unimplemented, "method not implemented"))
 	}
@@ -75,11 +75,10 @@ func (server *Server) UploadAvatar(w http.ResponseWriter, r *http.Request, authU
 	}
 	defer f.Close()
 
-	filename := util.RandomImageName(authUser.ID)
-	avatar := path.Join(server.config.AvatarPath, filename)
-	fullname := path.Join(server.config.PublicPath, avatar)
+	avatarSrc := path.Join(server.config.AvatarPath, util.RandomImageName())
+	fileName := path.Join(server.config.PublicPath, avatarSrc)
 
-	fn, err := os.OpenFile(fullname, os.O_WRONLY|os.O_CREATE, 0666)
+	fn, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		writeHttpError(w, NewHttpError(codes.Internal, "failed to save the new avatar file"))
 		return
@@ -90,7 +89,7 @@ func (server *Server) UploadAvatar(w http.ResponseWriter, r *http.Request, authU
 	// update avatar src of user in database
 	arg := db.UpdateUserParams{
 		ID:     authUser.ID,
-		Avatar: sql.NullString{String: avatar, Valid: true},
+		Avatar: sql.NullString{String: avatarSrc, Valid: true},
 	}
 
 	user, err := server.store.UpdateUser(r.Context(), arg)
@@ -118,7 +117,7 @@ type UploadPostImageResponse struct {
 }
 
 // UploadPostImage
-func (server *Server) UploadPostImage(w http.ResponseWriter, r *http.Request, authUser *db.User) {
+func (server *Server) UploadPostImage(w http.ResponseWriter, r *http.Request) {
 	// maxMemory set as 5M for post image
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
 		writeHttpError(w, NewHttpError(codes.InvalidArgument, "failed to parse multipart form"))
@@ -132,11 +131,10 @@ func (server *Server) UploadPostImage(w http.ResponseWriter, r *http.Request, au
 	}
 	defer f.Close()
 
-	filename := util.RandomImageName(authUser.ID)
-	image := path.Join(server.config.PostPath, filename)
-	fullname := path.Join(server.config.PublicPath, image)
+	imageSrc := path.Join(server.config.PostPath, util.RandomImageName())
+	fileName := path.Join(server.config.PublicPath, imageSrc)
 
-	fn, err := os.OpenFile(fullname, os.O_WRONLY|os.O_CREATE, 0666)
+	fn, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		writeHttpError(w, NewHttpError(codes.Internal, "failed to save the new image file"))
 		return
@@ -144,7 +142,7 @@ func (server *Server) UploadPostImage(w http.ResponseWriter, r *http.Request, au
 	defer fn.Close()
 	io.Copy(fn, f)
 
-	if err = writeHttpResponse(w, &UploadPostImageResponse{Image: image}); err != nil {
+	if err = writeHttpResponse(w, &UploadPostImageResponse{Image: imageSrc}); err != nil {
 		writeHttpError(w, NewHttpError(codes.Internal, err.Error()))
 	}
 }

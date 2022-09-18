@@ -1,6 +1,6 @@
 -- name: CreatePost :one
-INSERT INTO posts (author_id, title, abstract, cover_image)
-VALUES ($1, $2, $3, $4) RETURNING *;
+INSERT INTO posts (author_id, title, cover_image)
+VALUES ($1, $2, $3) RETURNING *;
 
 -- name: CreatePostContent :one
 INSERT INTO post_contents (id, content)
@@ -15,7 +15,6 @@ WHERE id = @id::bigint AND author_id = @author_id::bigint
 UPDATE posts
 SET
   title = coalesce(sqlc.narg('title'), title),
-  abstract = coalesce(sqlc.narg('abstract'), abstract),
   cover_image = coalesce(sqlc.narg('cover_image'), cover_image),
   update_at = now()
 WHERE id = $1 AND author_id = @author_id::bigint
@@ -85,7 +84,7 @@ Tag_CTE AS (
     AND pt.post_id = ANY(SELECT id FROM Post_CTE)
   GROUP BY pt.post_id
 )
-SELECT p.*, cnt.total, u.username, u.email, u.avatar,
+SELECT p.*, cnt.total, u.username, u.avatar,
       cc.category_ids, cc.category_names,
       tc.tag_ids, tc.tag_names
 FROM Post_CTE p
@@ -123,9 +122,24 @@ WHERE p.id = @post_id::bigint
   AND (@is_admin::bool OR author_id = @author_id::bigint)
 LIMIT 1;
 
+-- name: GetFeaturedPosts :many
+SELECT p.id, p.title, p.cover_image, p.view_count,
+    p.author_id, u.username, u.avatar,
+    (SELECT count(*) FROM comments cm
+      WHERE cm.post_id = p.id) comment_count,
+    (SELECT count(*) FROM post_stars ps
+      WHERE ps.post_id = p.id) star_count
+FROM posts p
+JOIN users u ON u.id = p.author_id
+WHERE featured = true AND status = 'publish'
+ORDER BY random()
+LIMIT $1;
+
 -- name: GetPosts :many
 WITH Data_CTE AS (
-  SELECT * FROM posts
+  SELECT id, title, author_id, cover_image,
+      featured, view_count, publish_at
+  FROM posts
   WHERE status = 'publish'
     AND (@any_featured::bool OR featured = @featured::bool)
     AND (@any_author::bool OR author_id = @author_id::bigint)
@@ -163,12 +177,8 @@ Tag_CTE AS (
     AND pt.post_id = ANY(SELECT id FROM Post_CTE)
   GROUP BY pt.post_id
 )
-SELECT p.*, cnt.total, u.username, u.intro, u.avatar,
-    tc.tag_ids, tc.tag_names, fu.follower_id followed,
-    (SELECT count(*) FROM follows f
-      WHERE f.user_id = p.author_id) follower_count,
-    (SELECT count(*) FROM follows f
-      WHERE f.follower_id = p.author_id) following_count,
+SELECT p.*, cnt.total, u.username, u.avatar,
+    tc.tag_ids, tc.tag_names,
     (SELECT count(*) FROM comments cm
       WHERE cm.post_id = p.id) comment_count,
     (SELECT count(*) FROM post_stars ps
@@ -176,9 +186,7 @@ SELECT p.*, cnt.total, u.username, u.intro, u.avatar,
 FROM Post_CTE p
 CROSS JOIN Count_CTE cnt
 JOIN users u ON u.id = p.author_id
-LEFT JOIN Tag_CTE tc ON tc.post_id = p.id
-LEFT JOIN follows fu
-  ON fu.user_id = p.author_id AND fu.follower_id = @self_id::bigint;
+LEFT JOIN Tag_CTE tc ON tc.post_id = p.id;
 
 -- name: ReadPost :one
 WITH Post_CTE AS (

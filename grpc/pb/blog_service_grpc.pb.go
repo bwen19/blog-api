@@ -55,16 +55,18 @@ type BlogClient interface {
 	GetUserProfile(ctx context.Context, in *GetUserProfileRequest, opts ...grpc.CallOption) (*GetUserProfileResponse, error)
 	// MarkAllRead
 	MarkAllRead(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// LeaveMessage
-	LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// DeleteNotifs
 	DeleteNotifs(ctx context.Context, in *DeleteNotifsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListNotifs
 	ListNotifs(ctx context.Context, in *ListNotifsRequest, opts ...grpc.CallOption) (*ListNotifsResponse, error)
+	// LeaveMessage
+	LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListMessages
 	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
 	// CheckMessages
 	CheckMessages(ctx context.Context, in *CheckMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// DeleteMessages
+	DeleteMessages(ctx context.Context, in *DeleteMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// FollowUser
 	FollowUser(ctx context.Context, in *FollowUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListFollows
@@ -87,6 +89,8 @@ type BlogClient interface {
 	ListPosts(ctx context.Context, in *ListPostsRequest, opts ...grpc.CallOption) (*ListPostsResponse, error)
 	// GetPost
 	GetPost(ctx context.Context, in *GetPostRequest, opts ...grpc.CallOption) (*GetPostResponse, error)
+	// GetFeaturedPosts
+	GetFeaturedPosts(ctx context.Context, in *GetFeaturedPostsRequest, opts ...grpc.CallOption) (*GetFeaturedPostsResponse, error)
 	// GetPosts
 	GetPosts(ctx context.Context, in *GetPostsRequest, opts ...grpc.CallOption) (*GetPostsResponse, error)
 	// ReadPost
@@ -277,15 +281,6 @@ func (c *blogClient) MarkAllRead(ctx context.Context, in *emptypb.Empty, opts ..
 	return out, nil
 }
 
-func (c *blogClient) LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/pb.Blog/LeaveMessage", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *blogClient) DeleteNotifs(ctx context.Context, in *DeleteNotifsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/pb.Blog/DeleteNotifs", in, out, opts...)
@@ -304,6 +299,15 @@ func (c *blogClient) ListNotifs(ctx context.Context, in *ListNotifsRequest, opts
 	return out, nil
 }
 
+func (c *blogClient) LeaveMessage(ctx context.Context, in *LeaveMessageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/pb.Blog/LeaveMessage", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *blogClient) ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error) {
 	out := new(ListMessagesResponse)
 	err := c.cc.Invoke(ctx, "/pb.Blog/ListMessages", in, out, opts...)
@@ -316,6 +320,15 @@ func (c *blogClient) ListMessages(ctx context.Context, in *ListMessagesRequest, 
 func (c *blogClient) CheckMessages(ctx context.Context, in *CheckMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/pb.Blog/CheckMessages", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogClient) DeleteMessages(ctx context.Context, in *DeleteMessagesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/pb.Blog/DeleteMessages", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -415,6 +428,15 @@ func (c *blogClient) ListPosts(ctx context.Context, in *ListPostsRequest, opts .
 func (c *blogClient) GetPost(ctx context.Context, in *GetPostRequest, opts ...grpc.CallOption) (*GetPostResponse, error) {
 	out := new(GetPostResponse)
 	err := c.cc.Invoke(ctx, "/pb.Blog/GetPost", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blogClient) GetFeaturedPosts(ctx context.Context, in *GetFeaturedPostsRequest, opts ...grpc.CallOption) (*GetFeaturedPostsResponse, error) {
+	out := new(GetFeaturedPostsResponse)
+	err := c.cc.Invoke(ctx, "/pb.Blog/GetFeaturedPosts", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -619,16 +641,18 @@ type BlogServer interface {
 	GetUserProfile(context.Context, *GetUserProfileRequest) (*GetUserProfileResponse, error)
 	// MarkAllRead
 	MarkAllRead(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	// LeaveMessage
-	LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error)
 	// DeleteNotifs
 	DeleteNotifs(context.Context, *DeleteNotifsRequest) (*emptypb.Empty, error)
 	// ListNotifs
 	ListNotifs(context.Context, *ListNotifsRequest) (*ListNotifsResponse, error)
+	// LeaveMessage
+	LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error)
 	// ListMessages
 	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
 	// CheckMessages
 	CheckMessages(context.Context, *CheckMessagesRequest) (*emptypb.Empty, error)
+	// DeleteMessages
+	DeleteMessages(context.Context, *DeleteMessagesRequest) (*emptypb.Empty, error)
 	// FollowUser
 	FollowUser(context.Context, *FollowUserRequest) (*emptypb.Empty, error)
 	// ListFollows
@@ -651,6 +675,8 @@ type BlogServer interface {
 	ListPosts(context.Context, *ListPostsRequest) (*ListPostsResponse, error)
 	// GetPost
 	GetPost(context.Context, *GetPostRequest) (*GetPostResponse, error)
+	// GetFeaturedPosts
+	GetFeaturedPosts(context.Context, *GetFeaturedPostsRequest) (*GetFeaturedPostsResponse, error)
 	// GetPosts
 	GetPosts(context.Context, *GetPostsRequest) (*GetPostsResponse, error)
 	// ReadPost
@@ -742,20 +768,23 @@ func (UnimplementedBlogServer) GetUserProfile(context.Context, *GetUserProfileRe
 func (UnimplementedBlogServer) MarkAllRead(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkAllRead not implemented")
 }
-func (UnimplementedBlogServer) LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LeaveMessage not implemented")
-}
 func (UnimplementedBlogServer) DeleteNotifs(context.Context, *DeleteNotifsRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNotifs not implemented")
 }
 func (UnimplementedBlogServer) ListNotifs(context.Context, *ListNotifsRequest) (*ListNotifsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListNotifs not implemented")
 }
+func (UnimplementedBlogServer) LeaveMessage(context.Context, *LeaveMessageRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LeaveMessage not implemented")
+}
 func (UnimplementedBlogServer) ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMessages not implemented")
 }
 func (UnimplementedBlogServer) CheckMessages(context.Context, *CheckMessagesRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckMessages not implemented")
+}
+func (UnimplementedBlogServer) DeleteMessages(context.Context, *DeleteMessagesRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMessages not implemented")
 }
 func (UnimplementedBlogServer) FollowUser(context.Context, *FollowUserRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FollowUser not implemented")
@@ -789,6 +818,9 @@ func (UnimplementedBlogServer) ListPosts(context.Context, *ListPostsRequest) (*L
 }
 func (UnimplementedBlogServer) GetPost(context.Context, *GetPostRequest) (*GetPostResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPost not implemented")
+}
+func (UnimplementedBlogServer) GetFeaturedPosts(context.Context, *GetFeaturedPostsRequest) (*GetFeaturedPostsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFeaturedPosts not implemented")
 }
 func (UnimplementedBlogServer) GetPosts(context.Context, *GetPostsRequest) (*GetPostsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPosts not implemented")
@@ -1145,24 +1177,6 @@ func _Blog_MarkAllRead_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Blog_LeaveMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LeaveMessageRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlogServer).LeaveMessage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.Blog/LeaveMessage",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlogServer).LeaveMessage(ctx, req.(*LeaveMessageRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Blog_DeleteNotifs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteNotifsRequest)
 	if err := dec(in); err != nil {
@@ -1199,6 +1213,24 @@ func _Blog_ListNotifs_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Blog_LeaveMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).LeaveMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/LeaveMessage",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).LeaveMessage(ctx, req.(*LeaveMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Blog_ListMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListMessagesRequest)
 	if err := dec(in); err != nil {
@@ -1231,6 +1263,24 @@ func _Blog_CheckMessages_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BlogServer).CheckMessages(ctx, req.(*CheckMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Blog_DeleteMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).DeleteMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/DeleteMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).DeleteMessages(ctx, req.(*DeleteMessagesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1429,6 +1479,24 @@ func _Blog_GetPost_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BlogServer).GetPost(ctx, req.(*GetPostRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Blog_GetFeaturedPosts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFeaturedPostsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlogServer).GetFeaturedPosts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pb.Blog/GetFeaturedPosts",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlogServer).GetFeaturedPosts(ctx, req.(*GetFeaturedPostsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1829,10 +1897,6 @@ var Blog_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Blog_MarkAllRead_Handler,
 		},
 		{
-			MethodName: "LeaveMessage",
-			Handler:    _Blog_LeaveMessage_Handler,
-		},
-		{
 			MethodName: "DeleteNotifs",
 			Handler:    _Blog_DeleteNotifs_Handler,
 		},
@@ -1841,12 +1905,20 @@ var Blog_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Blog_ListNotifs_Handler,
 		},
 		{
+			MethodName: "LeaveMessage",
+			Handler:    _Blog_LeaveMessage_Handler,
+		},
+		{
 			MethodName: "ListMessages",
 			Handler:    _Blog_ListMessages_Handler,
 		},
 		{
 			MethodName: "CheckMessages",
 			Handler:    _Blog_CheckMessages_Handler,
+		},
+		{
+			MethodName: "DeleteMessages",
+			Handler:    _Blog_DeleteMessages_Handler,
 		},
 		{
 			MethodName: "FollowUser",
@@ -1891,6 +1963,10 @@ var Blog_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPost",
 			Handler:    _Blog_GetPost_Handler,
+		},
+		{
+			MethodName: "GetFeaturedPosts",
+			Handler:    _Blog_GetFeaturedPosts_Handler,
 		},
 		{
 			MethodName: "GetPosts",

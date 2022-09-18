@@ -27,35 +27,6 @@ func (server *Server) MarkAllRead(ctx context.Context, req *emptypb.Empty) (*emp
 }
 
 // -------------------------------------------------------------------
-// LeaveMessage
-func (server *Server) LeaveMessage(ctx context.Context, req *pb.LeaveMessageRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
-	}
-
-	if req.GetTitle() == "" {
-		return nil, status.Error(codes.InvalidArgument, "title should not be empty")
-	}
-
-	if req.GetContent() == "" {
-		return nil, status.Error(codes.InvalidArgument, "content should not be empty")
-	}
-
-	arg := db.CreateNotificationParams{
-		UserID:  authUser.ID,
-		Kind:    "admin",
-		Title:   req.GetTitle(),
-		Content: req.GetContent(),
-	}
-	if err := server.store.CreateNotification(ctx, arg); err != nil {
-		return nil, status.Error(codes.Internal, "failed to leave message to admin")
-	}
-
-	return &emptypb.Empty{}, nil
-}
-
-// -------------------------------------------------------------------
 // DeleteNotifs
 func (server *Server) DeleteNotifs(ctx context.Context, req *pb.DeleteNotifsRequest) (*emptypb.Empty, error) {
 	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
@@ -74,7 +45,7 @@ func (server *Server) DeleteNotifs(ctx context.Context, req *pb.DeleteNotifsRequ
 	}
 
 	nrows, err := server.store.DeleteNotifications(ctx, arg)
-	if err != nil || int64(len(notifIDs)) != nrows {
+	if err != nil || len(notifIDs) != int(nrows) {
 		return nil, status.Error(codes.Internal, "failed to delete notifications")
 	}
 
@@ -112,7 +83,9 @@ func (server *Server) ListNotifs(ctx context.Context, req *pb.ListNotifsRequest)
 
 	notifIDs := []int64{}
 	for _, notif := range notifs {
-		notifIDs = append(notifIDs, notif.ID)
+		if notif.Unread {
+			notifIDs = append(notifIDs, notif.ID)
+		}
 	}
 
 	mArg := db.MarkNotificationsParams{
@@ -125,6 +98,35 @@ func (server *Server) ListNotifs(ctx context.Context, req *pb.ListNotifsRequest)
 	}
 
 	return convertListNotifs(notifs, nrows), nil
+}
+
+// -------------------------------------------------------------------
+// LeaveMessage
+func (server *Server) LeaveMessage(ctx context.Context, req *pb.LeaveMessageRequest) (*emptypb.Empty, error) {
+	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
+	if !ok {
+		return nil, status.Error(codes.Internal, "failed to get auth user")
+	}
+
+	if req.GetTitle() == "" {
+		return nil, status.Error(codes.InvalidArgument, "title should not be empty")
+	}
+
+	if req.GetContent() == "" {
+		return nil, status.Error(codes.InvalidArgument, "content should not be empty")
+	}
+
+	arg := db.CreateNotificationParams{
+		UserID:  authUser.ID,
+		Kind:    "admin",
+		Title:   req.GetTitle(),
+		Content: req.GetContent(),
+	}
+	if err := server.store.CreateNotification(ctx, arg); err != nil {
+		return nil, status.Error(codes.Internal, "failed to leave message to admin")
+	}
+
+	return &emptypb.Empty{}, nil
 }
 
 // -------------------------------------------------------------------
@@ -162,6 +164,22 @@ func (server *Server) CheckMessages(ctx context.Context, req *pb.CheckMessagesRe
 
 	if _, err = server.store.MarkNotifications(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to check messages")
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+// -------------------------------------------------------------------
+// CheckMessages
+func (server *Server) DeleteMessages(ctx context.Context, req *pb.DeleteMessagesRequest) (*emptypb.Empty, error) {
+	messageIDs, err := util.ValidateRepeatedIDs(req.GetMessageIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "messageId: %s", err.Error())
+	}
+
+	nrows, err := server.store.DeleteMessages(ctx, messageIDs)
+	if err != nil || int(nrows) != len(messageIDs) {
+		return nil, status.Error(codes.Internal, "failed to delete messages")
 	}
 
 	return &emptypb.Empty{}, nil

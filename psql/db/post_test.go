@@ -120,9 +120,41 @@ func TestListPosts(t *testing.T) {
 	require.Equal(t, len(posts), 5)
 }
 
+func TestGetFeaturedPosts(t *testing.T) {
+	postIDs := []int64{}
+	for i := 0; i < 10; i++ {
+		post := createRandomPost(t)
+		postIDs = append(postIDs, post.ID)
+	}
+
+	arg1 := UpdatePostStatusParams{
+		Ids:       postIDs,
+		OldStatus: []string{"draft"},
+		Status:    "publish",
+		IsAdmin:   true,
+	}
+	p, err := testStore.UpdatePostStatus(context.Background(), arg1)
+	require.NoError(t, err)
+	require.NotEmpty(t, p)
+
+	for _, postID := range postIDs {
+		arg := UpdatePostFeatureParams{
+			ID:       postID,
+			Featured: true,
+		}
+		err := testStore.UpdatePostFeature(context.Background(), arg)
+		require.NoError(t, err)
+	}
+
+	posts, err := testStore.GetFeaturedPosts(context.Background(), 4)
+	require.NoError(t, err)
+	require.NotEmpty(t, posts)
+	require.Equal(t, 4, len(posts))
+}
+
 func TestGetPosts(t *testing.T) {
 	postIDs := []int64{}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		post := createRandomPost(t)
 		postIDs = append(postIDs, post.ID)
 	}
@@ -139,7 +171,6 @@ func TestGetPosts(t *testing.T) {
 
 	arg := GetPostsParams{
 		Limit:        5,
-		SelfID:       0,
 		AnyFeatured:  true,
 		AnyAuthor:    true,
 		AnyCategory:  true,
@@ -168,7 +199,6 @@ func TestGetPosts(t *testing.T) {
 
 	arg = GetPostsParams{
 		Limit:        3,
-		SelfID:       0,
 		Featured:     true,
 		AnyAuthor:    true,
 		AnyCategory:  true,
