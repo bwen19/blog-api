@@ -124,7 +124,7 @@ LIMIT 1;
 
 -- name: GetFeaturedPosts :many
 SELECT p.id, p.title, p.cover_image, p.view_count,
-    p.author_id, u.username, u.avatar,
+    p.publish_at, p.author_id, u.username, u.avatar,
     (SELECT count(*) FROM comments cm
       WHERE cm.post_id = p.id) comment_count,
     (SELECT count(*) FROM post_stars ps

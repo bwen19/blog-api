@@ -106,7 +106,7 @@ func (q *Queries) DeletePostStar(ctx context.Context, arg DeletePostStarParams) 
 
 const getFeaturedPosts = `-- name: GetFeaturedPosts :many
 SELECT p.id, p.title, p.cover_image, p.view_count,
-    p.author_id, u.username, u.avatar,
+    p.publish_at, p.author_id, u.username, u.avatar,
     (SELECT count(*) FROM comments cm
       WHERE cm.post_id = p.id) comment_count,
     (SELECT count(*) FROM post_stars ps
@@ -119,15 +119,16 @@ LIMIT $1
 `
 
 type GetFeaturedPostsRow struct {
-	ID           int64  `json:"id"`
-	Title        string `json:"title"`
-	CoverImage   string `json:"cover_image"`
-	ViewCount    int64  `json:"view_count"`
-	AuthorID     int64  `json:"author_id"`
-	Username     string `json:"username"`
-	Avatar       string `json:"avatar"`
-	CommentCount int64  `json:"comment_count"`
-	StarCount    int64  `json:"star_count"`
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	CoverImage   string    `json:"cover_image"`
+	ViewCount    int64     `json:"view_count"`
+	PublishAt    time.Time `json:"publish_at"`
+	AuthorID     int64     `json:"author_id"`
+	Username     string    `json:"username"`
+	Avatar       string    `json:"avatar"`
+	CommentCount int64     `json:"comment_count"`
+	StarCount    int64     `json:"star_count"`
 }
 
 func (q *Queries) GetFeaturedPosts(ctx context.Context, limit int32) ([]GetFeaturedPostsRow, error) {
@@ -144,6 +145,7 @@ func (q *Queries) GetFeaturedPosts(ctx context.Context, limit int32) ([]GetFeatu
 			&i.Title,
 			&i.CoverImage,
 			&i.ViewCount,
+			&i.PublishAt,
 			&i.AuthorID,
 			&i.Username,
 			&i.Avatar,

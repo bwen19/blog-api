@@ -107,6 +107,7 @@ message GetFeaturedPostsResponse {
         int64 view_count = 5;
         int64 star_count = 6;
         int64 comment_count = 7;
+        google.protobuf.Timestamp publish_at = 8;
     }
     repeated PostItem posts = 1;
 }

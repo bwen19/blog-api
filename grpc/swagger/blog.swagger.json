@@ -2524,6 +2524,10 @@
         "commentCount": {
           "type": "string",
           "format": "int64"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

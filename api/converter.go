@@ -367,6 +367,7 @@ func convertFeaturedPosts(posts []db.GetFeaturedPostsRow) *pb.GetFeaturedPostsRe
 			ViewCount:    post.ViewCount,
 			StarCount:    post.StarCount,
 			CommentCount: post.CommentCount,
+			PublishAt:    timestamppb.New(post.PublishAt),
 		}
 		rspPosts = append(rspPosts, pbPost)
 	}
