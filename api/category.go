@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bwen19/blog/grpc/pb"
 	"github.com/bwen19/blog/psql/db"
@@ -12,9 +13,13 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// CreateCategory
+// ========================// CreateCategory //======================== //
+
 func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategoryRequest) (*pb.CreateCategoryResponse, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
 	}
@@ -34,31 +39,35 @@ func (server *Server) CreateCategory(ctx context.Context, req *pb.CreateCategory
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// DeleteCategories
+// ========================// DeleteCategories //======================== //
+
 func (server *Server) DeleteCategories(ctx context.Context, req *pb.DeleteCategoriesRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	categoryIDs, err := util.ValidateRepeatedIDs(req.GetCategoryIds())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
 	}
 
 	nrows, err := server.store.DeleteCategories(ctx, categoryIDs)
-	if err != nil || int64(len(categoryIDs)) != nrows {
+	if err != nil || len(categoryIDs) != int(nrows) {
 		return nil, status.Error(codes.Internal, "failed to delete categories")
 	}
 
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// UpdateCategory
+// ========================// UpdateCategory //======================== //
+
 func (server *Server) UpdateCategory(ctx context.Context, req *pb.UpdateCategoryRequest) (*pb.UpdateCategoryResponse, error) {
-	if err := util.ValidateID(req.GetCategoryId()); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "categoryId: %s", err.Error())
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
+	if err := validateUpdateCategoryRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.UpdateCategoryParams{
@@ -81,9 +90,23 @@ func (server *Server) UpdateCategory(ctx context.Context, req *pb.UpdateCategory
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// ListCategories
+func validateUpdateCategoryRequest(req *pb.UpdateCategoryRequest) error {
+	if err := util.ValidateID(req.GetCategoryId()); err != nil {
+		return fmt.Errorf("categoryId: %s", err.Error())
+	}
+	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
+		return fmt.Errorf("name: %s", err.Error())
+	}
+	return nil
+}
+
+// ========================// ListCategories //======================== //
+
 func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategoriesRequest) (*pb.ListCategoriesResponse, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	options := []string{"name", ""}
 	if err := util.ValidateOrder(req, options); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -98,12 +121,11 @@ func (server *Server) ListCategories(ctx context.Context, req *pb.ListCategories
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
-
 	return convertListCategories(categories), nil
 }
 
-// -------------------------------------------------------------------
-// GetCategories
+// ========================// GetCategories //======================== //
+
 func (server *Server) GetCategories(ctx context.Context, req *emptypb.Empty) (*pb.GetCategoriesResponse, error) {
 	categories, err := server.store.GetCategories(ctx)
 	if err != nil {

@@ -51,7 +51,6 @@ type Post struct {
 	ID         int64     `json:"id"`
 	AuthorID   int64     `json:"author_id"`
 	Title      string    `json:"title"`
-	Abstract   string    `json:"abstract"`
 	CoverImage string    `json:"cover_image"`
 	Status     string    `json:"status"`
 	Featured   bool      `json:"featured"`

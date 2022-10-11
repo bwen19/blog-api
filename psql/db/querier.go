@@ -29,16 +29,18 @@ type Querier interface {
 	DeleteCommentStar(ctx context.Context, arg DeleteCommentStarParams) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteFollow(ctx context.Context, arg DeleteFollowParams) error
+	DeleteMessages(ctx context.Context, ids []int64) (int64, error)
 	DeleteNotifications(ctx context.Context, arg DeleteNotificationsParams) (int64, error)
 	DeletePost(ctx context.Context, arg DeletePostParams) error
 	DeletePostCategories(ctx context.Context, arg DeletePostCategoriesParams) error
 	DeletePostStar(ctx context.Context, arg DeletePostStarParams) error
 	DeletePostTags(ctx context.Context, arg DeletePostTagsParams) error
 	DeleteSession(ctx context.Context, arg DeleteSessionParams) error
-	DeleteSessions(ctx context.Context, arg DeleteSessionsParams) (int64, error)
+	DeleteSessions(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteTags(ctx context.Context, ids []int64) (int64, error)
 	DeleteUsers(ctx context.Context, ids []int64) (int64, error)
 	GetCategories(ctx context.Context) ([]Category, error)
+	GetFeaturedPosts(ctx context.Context, limit int32) ([]GetFeaturedPostsRow, error)
 	GetPost(ctx context.Context, arg GetPostParams) (GetPostRow, error)
 	GetPostCategories(ctx context.Context, postID int64) ([]Category, error)
 	GetPostTags(ctx context.Context, postID int64) ([]Tag, error)

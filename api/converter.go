@@ -22,9 +22,9 @@ func convertListUsers(users []db.ListUsersRow) *pb.ListUsersResponse {
 		return &pb.ListUsersResponse{}
 	}
 
-	rspUsers := make([]*pb.ListUsersResponse_UserItem, 0, 5)
+	rspUsers := make([]*pb.ListUsersResponse_User, 0, 5)
 	for _, user := range users {
-		pbUser := &pb.ListUsersResponse_UserItem{
+		pbUser := &pb.ListUsersResponse_User{
 			Id:        user.ID,
 			Username:  user.Username,
 			Email:     user.Email,
@@ -119,8 +119,9 @@ func convertLisMessages(messages []db.ListMessagesRow) *pb.ListMessagesResponse 
 	}
 
 	return &pb.ListMessagesResponse{
-		Total:    messages[0].Total,
-		Messages: rspMessages,
+		Total:       messages[0].Total,
+		UnreadCount: messages[0].UnreadCount,
+		Messages:    rspMessages,
 	}
 }
 
@@ -240,9 +241,10 @@ func convertNewPost(post db.CreateNewPostRow) *pb.Post {
 	return &pb.Post{
 		Id:         post.ID,
 		Title:      post.Title,
-		Abstract:   post.Abstract,
 		CoverImage: post.CoverImage,
 		Content:    post.Content,
+		Featured:   post.Featured,
+		Status:     post.Status,
 	}
 }
 
@@ -250,7 +252,6 @@ func convertUpdatePost(post db.Post, content db.PostContent, categories []db.Cat
 	pbPost := &pb.Post{
 		Id:         post.ID,
 		Title:      post.Title,
-		Abstract:   post.Abstract,
 		CoverImage: post.CoverImage,
 		Content:    content.Content,
 		Categories: convertCategories(categories),
@@ -266,34 +267,33 @@ func convertListPosts(posts []db.ListPostsRow) *pb.ListPostsResponse {
 		return &pb.ListPostsResponse{}
 	}
 
-	rspPosts := []*pb.PostItem{}
+	rspPosts := []*pb.ListPostsResponse_PostItem{}
 	for _, post := range posts {
-		author := &pb.User{
+		author := &pb.UserItem{
 			Id:       post.AuthorID,
 			Username: post.Username,
-			Email:    post.Email,
 			Avatar:   post.Avatar,
 		}
 
-		categories := []*pb.Category{}
-		for i := 0; i < len(post.CategoryIds); i++ {
+		categories := make([]*pb.Category, 0, 2)
+		for i, categoryID := range post.CategoryIds {
 			category := &pb.Category{
-				Id:   post.CategoryIds[i],
+				Id:   categoryID,
 				Name: post.CategoryNames[i],
 			}
 			categories = append(categories, category)
 		}
 
-		tags := []*pb.Tag{}
-		for i := 0; i < len(post.TagIds); i++ {
+		tags := make([]*pb.Tag, 0, 5)
+		for i, tagID := range post.TagIds {
 			tag := &pb.Tag{
-				Id:   post.TagIds[i],
+				Id:   tagID,
 				Name: post.TagNames[i],
 			}
 			tags = append(tags, tag)
 		}
 
-		pbPost := &pb.PostItem{
+		pbPost := &pb.ListPostsResponse_PostItem{
 			Id:         post.ID,
 			Title:      post.Title,
 			Author:     author,
@@ -315,28 +315,27 @@ func convertListPosts(posts []db.ListPostsRow) *pb.ListPostsResponse {
 }
 
 func convertGetPost(post db.GetPostRow) *pb.GetPostResponse {
-	tags := []*pb.Tag{}
-	for i := 0; i < len(post.TagIds); i++ {
-		tag := &pb.Tag{
-			Id:   post.TagIds[i],
-			Name: post.TagNames[i],
-		}
-		tags = append(tags, tag)
-	}
-
-	categories := []*pb.Category{}
-	for i := 0; i < len(post.CategoryIds); i++ {
+	categories := make([]*pb.Category, 0, 2)
+	for i, categoryID := range post.CategoryIds {
 		category := &pb.Category{
-			Id:   post.CategoryIds[i],
+			Id:   categoryID,
 			Name: post.CategoryNames[i],
 		}
 		categories = append(categories, category)
 	}
 
+	tags := make([]*pb.Tag, 0, 5)
+	for i, tagID := range post.TagIds {
+		tag := &pb.Tag{
+			Id:   tagID,
+			Name: post.TagNames[i],
+		}
+		tags = append(tags, tag)
+	}
+
 	pbPost := &pb.Post{
 		Id:         post.ID,
 		Title:      post.Title,
-		Abstract:   post.Abstract,
 		CoverImage: post.CoverImage,
 		Content:    post.Content,
 		Categories: categories,
@@ -348,6 +347,33 @@ func convertGetPost(post db.GetPostRow) *pb.GetPostResponse {
 	return &pb.GetPostResponse{Post: pbPost}
 }
 
+func convertFeaturedPosts(posts []db.GetFeaturedPostsRow) *pb.GetFeaturedPostsResponse {
+	if len(posts) == 0 {
+		return &pb.GetFeaturedPostsResponse{}
+	}
+
+	rspPosts := []*pb.GetFeaturedPostsResponse_PostItem{}
+	for _, post := range posts {
+		author := &pb.UserItem{
+			Id:       post.AuthorID,
+			Username: post.Username,
+			Avatar:   post.Avatar,
+		}
+		pbPost := &pb.GetFeaturedPostsResponse_PostItem{
+			Id:           post.ID,
+			Title:        post.Title,
+			Author:       author,
+			CoverImage:   post.CoverImage,
+			ViewCount:    post.ViewCount,
+			StarCount:    post.StarCount,
+			CommentCount: post.CommentCount,
+			PublishAt:    timestamppb.New(post.PublishAt),
+		}
+		rspPosts = append(rspPosts, pbPost)
+	}
+	return &pb.GetFeaturedPostsResponse{Posts: rspPosts}
+}
+
 func convertGetPosts(posts []db.GetPostsRow) *pb.GetPostsResponse {
 	if len(posts) == 0 {
 		return &pb.GetPostsResponse{}
@@ -355,20 +381,16 @@ func convertGetPosts(posts []db.GetPostsRow) *pb.GetPostsResponse {
 
 	rspPosts := []*pb.GetPostsResponse_PostItem{}
 	for _, post := range posts {
-		author := &pb.UserInfo{
-			Id:             post.AuthorID,
-			Username:       post.Username,
-			Intro:          post.Intro,
-			Avatar:         post.Avatar,
-			FollowerCount:  post.FollowerCount,
-			FollowingCount: post.FollowingCount,
-			Followed:       post.Followed.Valid,
+		author := &pb.UserItem{
+			Id:       post.AuthorID,
+			Username: post.Username,
+			Avatar:   post.Avatar,
 		}
 
-		tags := []*pb.Tag{}
-		for i := 0; i < len(post.TagIds); i++ {
+		tags := make([]*pb.Tag, 0, 5)
+		for i, tagID := range post.TagIds {
 			tag := &pb.Tag{
-				Id:   post.TagIds[i],
+				Id:   tagID,
 				Name: post.TagNames[i],
 			}
 			tags = append(tags, tag)
@@ -378,7 +400,6 @@ func convertGetPosts(posts []db.GetPostsRow) *pb.GetPostsResponse {
 			Id:           post.ID,
 			Title:        post.Title,
 			Author:       author,
-			Abstract:     post.Abstract,
 			CoverImage:   post.CoverImage,
 			Tags:         tags,
 			ViewCount:    post.ViewCount,
@@ -407,18 +428,18 @@ func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 	}
 
 	categories := make([]*pb.Category, 0, 2)
-	for i := 0; i < len(post.CategoryIds); i++ {
+	for i, categoryID := range post.CategoryIds {
 		category := &pb.Category{
-			Id:   post.CategoryIds[i],
+			Id:   categoryID,
 			Name: post.CategoryNames[i],
 		}
 		categories = append(categories, category)
 	}
 
 	tags := make([]*pb.Tag, 0, 5)
-	for i := 0; i < len(post.TagIds); i++ {
+	for i, tagID := range post.TagIds {
 		tag := &pb.Tag{
-			Id:   post.TagIds[i],
+			Id:   tagID,
 			Name: post.TagNames[i],
 		}
 		tags = append(tags, tag)
@@ -439,7 +460,7 @@ func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 	return &pb.ReadPostResponse{Post: pbPost}
 }
 
-func convertCreateComment(comment db.CreateCommentRow, user db.User) *pb.CreateCommentResponse {
+func convertCreateComment(comment db.CreateCommentRow, user *db.User) *pb.CreateCommentResponse {
 	var replyUser *pb.UserInfo
 	if comment.ReplyUserID.Valid {
 		replyUser = &pb.UserInfo{

@@ -12,12 +12,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// DeleteSessions
+// ========================// DeleteSessions //======================== //
+
 func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessionsRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	dict := map[string]byte{}
@@ -35,39 +34,37 @@ func (server *Server) DeleteSessions(ctx context.Context, req *pb.DeleteSessions
 		ids = append(ids, sessionID)
 	}
 
-	arg := db.DeleteSessionsParams{
-		Ids:    ids,
-		UserID: authUser.ID,
-	}
-
-	nrows, err := server.store.DeleteSessions(ctx, arg)
-	if err != nil || int64(len(ids)) != nrows {
+	nrows, err := server.store.DeleteSessions(ctx, ids)
+	if err != nil || len(ids) != int(nrows) {
 		return nil, status.Error(codes.Internal, "failed to delete sessions")
 	}
 
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// DeleteExpiredSessions
+// ========================// DeleteExpiredSessions //======================== //
+
 func (server *Server) DeleteExpiredSessions(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := server.store.DeleteExpiredSessions(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete expired sessions: %s", err.Error())
 	}
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// ListSessions
+// ========================// ListSessions //======================== //
+
 func (server *Server) ListSessions(ctx context.Context, req *pb.ListSessionsRequest) (*pb.ListSessionsResponse, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	options := []string{"clientIp", "createAt", "expiresAt"}
 	if err := util.ValidatePageOrder(req, options); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	arg := db.ListSessionsParams{
@@ -79,7 +76,6 @@ func (server *Server) ListSessions(ctx context.Context, req *pb.ListSessionsRequ
 		CreateAtDesc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 		ExpiresAtAsc:  req.GetOrderBy() == "expiresAt" && req.GetOrder() == "asc",
 		ExpiresAtDesc: req.GetOrderBy() == "expiresAt" && req.GetOrder() == "desc",
-		UserID:        authUser.ID,
 	}
 
 	sessions, err := server.store.ListSessions(ctx, arg)

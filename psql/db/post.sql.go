@@ -14,30 +14,23 @@ import (
 )
 
 const createPost = `-- name: CreatePost :one
-INSERT INTO posts (author_id, title, abstract, cover_image)
-VALUES ($1, $2, $3, $4) RETURNING id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at
+INSERT INTO posts (author_id, title, cover_image)
+VALUES ($1, $2, $3) RETURNING id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at
 `
 
 type CreatePostParams struct {
 	AuthorID   int64  `json:"author_id"`
 	Title      string `json:"title"`
-	Abstract   string `json:"abstract"`
 	CoverImage string `json:"cover_image"`
 }
 
 func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, error) {
-	row := q.db.QueryRowContext(ctx, createPost,
-		arg.AuthorID,
-		arg.Title,
-		arg.Abstract,
-		arg.CoverImage,
-	)
+	row := q.db.QueryRowContext(ctx, createPost, arg.AuthorID, arg.Title, arg.CoverImage)
 	var i Post
 	err := row.Scan(
 		&i.ID,
 		&i.AuthorID,
 		&i.Title,
-		&i.Abstract,
 		&i.CoverImage,
 		&i.Status,
 		&i.Featured,
@@ -111,6 +104,67 @@ func (q *Queries) DeletePostStar(ctx context.Context, arg DeletePostStarParams) 
 	return err
 }
 
+const getFeaturedPosts = `-- name: GetFeaturedPosts :many
+SELECT p.id, p.title, p.cover_image, p.view_count,
+    p.publish_at, p.author_id, u.username, u.avatar,
+    (SELECT count(*) FROM comments cm
+      WHERE cm.post_id = p.id) comment_count,
+    (SELECT count(*) FROM post_stars ps
+      WHERE ps.post_id = p.id) star_count
+FROM posts p
+JOIN users u ON u.id = p.author_id
+WHERE featured = true AND status = 'publish'
+ORDER BY random()
+LIMIT $1
+`
+
+type GetFeaturedPostsRow struct {
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	CoverImage   string    `json:"cover_image"`
+	ViewCount    int64     `json:"view_count"`
+	PublishAt    time.Time `json:"publish_at"`
+	AuthorID     int64     `json:"author_id"`
+	Username     string    `json:"username"`
+	Avatar       string    `json:"avatar"`
+	CommentCount int64     `json:"comment_count"`
+	StarCount    int64     `json:"star_count"`
+}
+
+func (q *Queries) GetFeaturedPosts(ctx context.Context, limit int32) ([]GetFeaturedPostsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getFeaturedPosts, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetFeaturedPostsRow{}
+	for rows.Next() {
+		var i GetFeaturedPostsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CoverImage,
+			&i.ViewCount,
+			&i.PublishAt,
+			&i.AuthorID,
+			&i.Username,
+			&i.Avatar,
+			&i.CommentCount,
+			&i.StarCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPost = `-- name: GetPost :one
 WITH Category_CTE AS (
   SELECT pc.post_id,
@@ -130,7 +184,7 @@ Tag_CTE AS (
     ON pt.tag_id = t.id AND pt.post_id = $1::bigint
   GROUP BY pt.post_id
 )
-SELECT p.id, p.author_id, p.title, p.abstract, p.cover_image, p.status, p.featured, p.view_count, p.update_at, p.publish_at, pc.content, cc.category_ids, cc.category_names,
+SELECT p.id, p.author_id, p.title, p.cover_image, p.status, p.featured, p.view_count, p.update_at, p.publish_at, pc.content, cc.category_ids, cc.category_names,
     tc.tag_ids, tc.tag_names
 FROM posts p
 JOIN post_contents pc ON pc.id = p.id
@@ -151,7 +205,6 @@ type GetPostRow struct {
 	ID            int64     `json:"id"`
 	AuthorID      int64     `json:"author_id"`
 	Title         string    `json:"title"`
-	Abstract      string    `json:"abstract"`
 	CoverImage    string    `json:"cover_image"`
 	Status        string    `json:"status"`
 	Featured      bool      `json:"featured"`
@@ -172,7 +225,6 @@ func (q *Queries) GetPost(ctx context.Context, arg GetPostParams) (GetPostRow, e
 		&i.ID,
 		&i.AuthorID,
 		&i.Title,
-		&i.Abstract,
 		&i.CoverImage,
 		&i.Status,
 		&i.Featured,
@@ -190,30 +242,32 @@ func (q *Queries) GetPost(ctx context.Context, arg GetPostParams) (GetPostRow, e
 
 const getPosts = `-- name: GetPosts :many
 WITH Data_CTE AS (
-  SELECT id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at FROM posts
+  SELECT id, title, author_id, cover_image,
+      featured, view_count, publish_at
+  FROM posts
   WHERE status = 'publish'
-    AND ($4::bool OR featured = $5::bool)
-    AND ($6::bool OR author_id = $7::bigint)
-    AND ($8::bool OR id = ANY(
+    AND ($3::bool OR featured = $4::bool)
+    AND ($5::bool OR author_id = $6::bigint)
+    AND ($7::bool OR id = ANY(
       SELECT post_id FROM post_categories
-      WHERE category_id = $9::bigint
+      WHERE category_id = $8::bigint
     ))
-    AND ($10::bool OR id = ANY(
+    AND ($9::bool OR id = ANY(
       SELECT post_id FROM post_tags
-      WHERE tag_id = $11::bigint
+      WHERE tag_id = $10::bigint
     ))
-    AND ($12::bool OR title LIKE $13::varchar)
+    AND ($11::bool OR title LIKE $12::varchar)
 ),
 Count_CTE AS (
   SELECT count(*) total FROM Data_CTE
 ),
 Post_CTE AS (
-  SELECT id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at FROM Data_CTE
+  SELECT id, title, author_id, cover_image, featured, view_count, publish_at FROM Data_CTE
   ORDER BY
-    CASE WHEN $14::bool THEN publish_at END ASC,
-    CASE WHEN $15::bool THEN publish_at END DESC,
-    CASE WHEN $16::bool THEN view_count END ASC,
-    CASE WHEN $17::bool THEN view_count END DESC,
+    CASE WHEN $13::bool THEN publish_at END ASC,
+    CASE WHEN $14::bool THEN publish_at END DESC,
+    CASE WHEN $15::bool THEN view_count END ASC,
+    CASE WHEN $16::bool THEN view_count END DESC,
     id ASC
   LIMIT $1
   OFFSET $2
@@ -228,12 +282,8 @@ Tag_CTE AS (
     AND pt.post_id = ANY(SELECT id FROM Post_CTE)
   GROUP BY pt.post_id
 )
-SELECT p.id, p.author_id, p.title, p.abstract, p.cover_image, p.status, p.featured, p.view_count, p.update_at, p.publish_at, cnt.total, u.username, u.intro, u.avatar,
-    tc.tag_ids, tc.tag_names, fu.follower_id followed,
-    (SELECT count(*) FROM follows f
-      WHERE f.user_id = p.author_id) follower_count,
-    (SELECT count(*) FROM follows f
-      WHERE f.follower_id = p.author_id) following_count,
+SELECT p.id, p.title, p.author_id, p.cover_image, p.featured, p.view_count, p.publish_at, cnt.total, u.username, u.avatar,
+    tc.tag_ids, tc.tag_names,
     (SELECT count(*) FROM comments cm
       WHERE cm.post_id = p.id) comment_count,
     (SELECT count(*) FROM post_stars ps
@@ -242,14 +292,11 @@ FROM Post_CTE p
 CROSS JOIN Count_CTE cnt
 JOIN users u ON u.id = p.author_id
 LEFT JOIN Tag_CTE tc ON tc.post_id = p.id
-LEFT JOIN follows fu
-  ON fu.user_id = p.author_id AND fu.follower_id = $3::bigint
 `
 
 type GetPostsParams struct {
 	Limit         int32  `json:"limit"`
 	Offset        int32  `json:"offset"`
-	SelfID        int64  `json:"self_id"`
 	AnyFeatured   bool   `json:"any_featured"`
 	Featured      bool   `json:"featured"`
 	AnyAuthor     bool   `json:"any_author"`
@@ -267,34 +314,26 @@ type GetPostsParams struct {
 }
 
 type GetPostsRow struct {
-	ID             int64         `json:"id"`
-	AuthorID       int64         `json:"author_id"`
-	Title          string        `json:"title"`
-	Abstract       string        `json:"abstract"`
-	CoverImage     string        `json:"cover_image"`
-	Status         string        `json:"status"`
-	Featured       bool          `json:"featured"`
-	ViewCount      int64         `json:"view_count"`
-	UpdateAt       time.Time     `json:"update_at"`
-	PublishAt      time.Time     `json:"publish_at"`
-	Total          int64         `json:"total"`
-	Username       string        `json:"username"`
-	Intro          string        `json:"intro"`
-	Avatar         string        `json:"avatar"`
-	TagIds         []int64       `json:"tag_ids"`
-	TagNames       []string      `json:"tag_names"`
-	Followed       sql.NullInt64 `json:"followed"`
-	FollowerCount  int64         `json:"follower_count"`
-	FollowingCount int64         `json:"following_count"`
-	CommentCount   int64         `json:"comment_count"`
-	StarCount      int64         `json:"star_count"`
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	AuthorID     int64     `json:"author_id"`
+	CoverImage   string    `json:"cover_image"`
+	Featured     bool      `json:"featured"`
+	ViewCount    int64     `json:"view_count"`
+	PublishAt    time.Time `json:"publish_at"`
+	Total        int64     `json:"total"`
+	Username     string    `json:"username"`
+	Avatar       string    `json:"avatar"`
+	TagIds       []int64   `json:"tag_ids"`
+	TagNames     []string  `json:"tag_names"`
+	CommentCount int64     `json:"comment_count"`
+	StarCount    int64     `json:"star_count"`
 }
 
 func (q *Queries) GetPosts(ctx context.Context, arg GetPostsParams) ([]GetPostsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getPosts,
 		arg.Limit,
 		arg.Offset,
-		arg.SelfID,
 		arg.AnyFeatured,
 		arg.Featured,
 		arg.AnyAuthor,
@@ -319,24 +358,17 @@ func (q *Queries) GetPosts(ctx context.Context, arg GetPostsParams) ([]GetPostsR
 		var i GetPostsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.AuthorID,
 			&i.Title,
-			&i.Abstract,
+			&i.AuthorID,
 			&i.CoverImage,
-			&i.Status,
 			&i.Featured,
 			&i.ViewCount,
-			&i.UpdateAt,
 			&i.PublishAt,
 			&i.Total,
 			&i.Username,
-			&i.Intro,
 			&i.Avatar,
 			pq.Array(&i.TagIds),
 			pq.Array(&i.TagNames),
-			&i.Followed,
-			&i.FollowerCount,
-			&i.FollowingCount,
 			&i.CommentCount,
 			&i.StarCount,
 		); err != nil {
@@ -355,7 +387,7 @@ func (q *Queries) GetPosts(ctx context.Context, arg GetPostsParams) ([]GetPostsR
 
 const listPosts = `-- name: ListPosts :many
 WITH Data_CTE AS (
-  SELECT id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at FROM posts
+  SELECT id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at FROM posts
   WHERE ($3::bool OR author_id = $4::bigint)
     AND ($5::bool OR status = $6::varchar)
     AND ($7::bool OR title LIKE $8::varchar)
@@ -364,7 +396,7 @@ Count_CTE AS (
   SELECT count(*) total FROM Data_CTE
 ),
 Post_CTE AS (
-  SELECT id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at FROM Data_CTE
+  SELECT id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at FROM Data_CTE
   ORDER BY
     CASE WHEN $9::bool THEN update_at END ASC,
     CASE WHEN $10::bool THEN update_at END DESC,
@@ -396,7 +428,7 @@ Tag_CTE AS (
     AND pt.post_id = ANY(SELECT id FROM Post_CTE)
   GROUP BY pt.post_id
 )
-SELECT p.id, p.author_id, p.title, p.abstract, p.cover_image, p.status, p.featured, p.view_count, p.update_at, p.publish_at, cnt.total, u.username, u.email, u.avatar,
+SELECT p.id, p.author_id, p.title, p.cover_image, p.status, p.featured, p.view_count, p.update_at, p.publish_at, cnt.total, u.username, u.avatar,
       cc.category_ids, cc.category_names,
       tc.tag_ids, tc.tag_names
 FROM Post_CTE p
@@ -427,7 +459,6 @@ type ListPostsRow struct {
 	ID            int64     `json:"id"`
 	AuthorID      int64     `json:"author_id"`
 	Title         string    `json:"title"`
-	Abstract      string    `json:"abstract"`
 	CoverImage    string    `json:"cover_image"`
 	Status        string    `json:"status"`
 	Featured      bool      `json:"featured"`
@@ -436,7 +467,6 @@ type ListPostsRow struct {
 	PublishAt     time.Time `json:"publish_at"`
 	Total         int64     `json:"total"`
 	Username      string    `json:"username"`
-	Email         string    `json:"email"`
 	Avatar        string    `json:"avatar"`
 	CategoryIds   []int64   `json:"category_ids"`
 	CategoryNames []string  `json:"category_names"`
@@ -472,7 +502,6 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.ID,
 			&i.AuthorID,
 			&i.Title,
-			&i.Abstract,
 			&i.CoverImage,
 			&i.Status,
 			&i.Featured,
@@ -481,7 +510,6 @@ func (q *Queries) ListPosts(ctx context.Context, arg ListPostsParams) ([]ListPos
 			&i.PublishAt,
 			&i.Total,
 			&i.Username,
-			&i.Email,
 			&i.Avatar,
 			pq.Array(&i.CategoryIds),
 			pq.Array(&i.CategoryNames),
@@ -505,7 +533,7 @@ const readPost = `-- name: ReadPost :one
 WITH Post_CTE AS (
   UPDATE posts SET view_count = view_count + 1
   WHERE id = $1::bigint AND status = 'publish'
-  RETURNING id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at
+  RETURNING id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at
 ),
 Category_CTE AS (
   SELECT pc.post_id,
@@ -598,18 +626,16 @@ const updatePost = `-- name: UpdatePost :one
 UPDATE posts
 SET
   title = coalesce($2, title),
-  abstract = coalesce($3, abstract),
-  cover_image = coalesce($4, cover_image),
+  cover_image = coalesce($3, cover_image),
   update_at = now()
-WHERE id = $1 AND author_id = $5::bigint
+WHERE id = $1 AND author_id = $4::bigint
   AND status = ANY('{draft, revise}'::varchar[])
-RETURNING id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at
+RETURNING id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at
 `
 
 type UpdatePostParams struct {
 	ID         int64          `json:"id"`
 	Title      sql.NullString `json:"title"`
-	Abstract   sql.NullString `json:"abstract"`
 	CoverImage sql.NullString `json:"cover_image"`
 	AuthorID   int64          `json:"author_id"`
 }
@@ -618,7 +644,6 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (Post, e
 	row := q.db.QueryRowContext(ctx, updatePost,
 		arg.ID,
 		arg.Title,
-		arg.Abstract,
 		arg.CoverImage,
 		arg.AuthorID,
 	)
@@ -627,7 +652,6 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (Post, e
 		&i.ID,
 		&i.AuthorID,
 		&i.Title,
-		&i.Abstract,
 		&i.CoverImage,
 		&i.Status,
 		&i.Featured,
@@ -681,7 +705,7 @@ const updatePostStatus = `-- name: UpdatePostStatus :many
 UPDATE posts SET status = $1::varchar
 WHERE id = ANY($2::bigint[]) AND status = ANY($3::varchar[])
   AND ($4::bool OR author_id = $5::bigint)
-RETURNING id, author_id, title, abstract, cover_image, status, featured, view_count, update_at, publish_at
+RETURNING id, author_id, title, cover_image, status, featured, view_count, update_at, publish_at
 `
 
 type UpdatePostStatusParams struct {
@@ -711,7 +735,6 @@ func (q *Queries) UpdatePostStatus(ctx context.Context, arg UpdatePostStatusPara
 			&i.ID,
 			&i.AuthorID,
 			&i.Title,
-			&i.Abstract,
 			&i.CoverImage,
 			&i.Status,
 			&i.Featured,

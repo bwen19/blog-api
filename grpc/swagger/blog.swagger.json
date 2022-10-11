@@ -94,6 +94,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -228,6 +229,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -500,13 +502,14 @@
       }
     },
     "/api/comment/star": {
-      "put": {
+      "post": {
         "summary": "StarComment",
         "operationId": "Blog_StarComment",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -540,6 +543,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -622,6 +626,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -698,6 +703,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -729,6 +735,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -792,13 +799,14 @@
           "Blog"
         ]
       },
-      "put": {
-        "summary": "CheckMessages",
-        "operationId": "Blog_CheckMessages",
+      "delete": {
+        "summary": "DeleteMessages",
+        "operationId": "Blog_DeleteMessages",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -811,21 +819,44 @@
         },
         "parameters": [
           {
-            "name": "messageIds",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "int64"
-            },
-            "collectionFormat": "multi"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbDeleteMessagesRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "put": {
+        "summary": "CheckMessages",
+        "operationId": "Blog_CheckMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
           },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
           {
-            "name": "check",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbCheckMessagesRequest"
+            }
           }
         ],
         "tags": [
@@ -841,6 +872,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -939,37 +971,6 @@
           "Blog"
         ]
       },
-      "delete": {
-        "summary": "DeletePost",
-        "operationId": "Blog_DeletePost",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "properties": {}
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/pbDeletePostRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Blog"
-        ]
-      },
       "post": {
         "summary": "CreatePost",
         "operationId": "Blog_CreatePost",
@@ -993,6 +994,7 @@
             "in": "body",
             "required": true,
             "schema": {
+              "type": "object",
               "properties": {}
             }
           }
@@ -1010,6 +1012,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1061,69 +1064,6 @@
         ]
       }
     },
-    "/api/post/list": {
-      "get": {
-        "summary": "ListPosts",
-        "operationId": "Blog_ListPosts",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/pbListPostsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "pageId",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "orderBy",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "keyword",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Blog"
-        ]
-      }
-    },
     "/api/post/publish": {
       "post": {
         "summary": "PublishPost",
@@ -1132,6 +1072,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1144,15 +1085,12 @@
         },
         "parameters": [
           {
-            "name": "postIds",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "int64"
-            },
-            "collectionFormat": "multi"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbPublishPostRequest"
+            }
           }
         ],
         "tags": [
@@ -1168,6 +1106,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1201,6 +1140,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1213,15 +1153,12 @@
         },
         "parameters": [
           {
-            "name": "postIds",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "int64"
-            },
-            "collectionFormat": "multi"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbSubmitPostRequest"
+            }
           }
         ],
         "tags": [
@@ -1237,6 +1174,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1249,15 +1187,12 @@
         },
         "parameters": [
           {
-            "name": "postIds",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "int64"
-            },
-            "collectionFormat": "multi"
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/pbWithdrawPostRequest"
+            }
           }
         ],
         "tags": [
@@ -1274,6 +1209,37 @@
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/pbGetPostResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      },
+      "delete": {
+        "summary": "DeletePost",
+        "operationId": "Blog_DeletePost",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
             }
           },
           "default": {
@@ -1331,9 +1297,6 @@
                 "title": {
                   "type": "string"
                 },
-                "abstract": {
-                  "type": "string"
-                },
                 "coverImage": {
                   "type": "string"
                 },
@@ -1388,6 +1351,101 @@
             "required": true,
             "type": "string",
             "format": "int64"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/postft": {
+      "get": {
+        "summary": "GetFeaturedPosts",
+        "operationId": "Blog_GetFeaturedPosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetFeaturedPostsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "num",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "Blog"
+        ]
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "summary": "ListPosts",
+        "operationId": "Blog_ListPosts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbListPostsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -1452,6 +1510,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1485,6 +1544,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1563,6 +1623,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1758,6 +1819,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1789,6 +1851,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1822,6 +1885,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1879,6 +1943,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -2052,6 +2117,9 @@
         "id": {
           "type": "string"
         },
+        "user": {
+          "$ref": "#/definitions/pbUserItem"
+        },
         "userAgent": {
           "type": "string"
         },
@@ -2081,38 +2149,6 @@
         "postCount": {
           "type": "string",
           "format": "int64"
-        }
-      }
-    },
-    "ListUsersResponseUserItem": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
-        "username": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "avatar": {
-          "type": "string"
-        },
-        "postCount": {
-          "type": "string",
-          "format": "int64"
-        },
-        "role": {
-          "type": "string"
-        },
-        "deleted": {
-          "type": "boolean"
-        },
-        "createAt": {
-          "type": "string",
-          "format": "date-time"
         }
       }
     },
@@ -2156,6 +2192,21 @@
       "properties": {
         "user": {
           "$ref": "#/definitions/pbUser"
+        }
+      }
+    },
+    "pbCheckMessagesRequest": {
+      "type": "object",
+      "properties": {
+        "messageIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        },
+        "check": {
+          "type": "boolean"
         }
       }
     },
@@ -2333,6 +2384,18 @@
         }
       }
     },
+    "pbDeleteMessagesRequest": {
+      "type": "object",
+      "properties": {
+        "messageIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
     "pbDeleteNotifsRequest": {
       "type": "object",
       "properties": {
@@ -2342,15 +2405,6 @@
             "type": "string",
             "format": "int64"
           }
-        }
-      }
-    },
-    "pbDeletePostRequest": {
-      "type": "object",
-      "properties": {
-        "postId": {
-          "type": "string",
-          "format": "int64"
         }
       }
     },
@@ -2412,6 +2466,51 @@
         }
       }
     },
+    "pbGetFeaturedPostsResponse": {
+      "type": "object",
+      "properties": {
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbGetFeaturedPostsResponsePostItem"
+          }
+        }
+      }
+    },
+    "pbGetFeaturedPostsResponsePostItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/definitions/pbUserItem"
+        },
+        "coverImage": {
+          "type": "string"
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "starCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "commentCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "pbGetPostResponse": {
       "type": "object",
       "properties": {
@@ -2446,10 +2545,7 @@
           "type": "string"
         },
         "author": {
-          "$ref": "#/definitions/pbUserInfo"
-        },
-        "abstract": {
-          "type": "string"
+          "$ref": "#/definitions/pbUserItem"
         },
         "coverImage": {
           "type": "string"
@@ -2643,8 +2739,53 @@
         "posts": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/pbPostItem"
+            "$ref": "#/definitions/pbListPostsResponsePostItem"
           }
+        }
+      }
+    },
+    "pbListPostsResponsePostItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/definitions/pbUserItem"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbCategory"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pbTag"
+          }
+        },
+        "status": {
+          "type": "string"
+        },
+        "featured": {
+          "type": "boolean"
+        },
+        "viewCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "updateAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "publishAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -2703,8 +2844,40 @@
         "users": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ListUsersResponseUserItem"
+            "$ref": "#/definitions/pbListUsersResponseUser"
           }
+        }
+      }
+    },
+    "pbListUsersResponseUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "postCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "role": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -2783,9 +2956,6 @@
         "title": {
           "type": "string"
         },
-        "abstract": {
-          "type": "string"
-        },
         "coverImage": {
           "type": "string"
         },
@@ -2812,48 +2982,15 @@
         }
       }
     },
-    "pbPostItem": {
+    "pbPublishPostRequest": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
-        "title": {
-          "type": "string"
-        },
-        "author": {
-          "$ref": "#/definitions/pbUser"
-        },
-        "categories": {
+        "postIds": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/pbCategory"
+            "type": "string",
+            "format": "int64"
           }
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/pbTag"
-          }
-        },
-        "status": {
-          "type": "string"
-        },
-        "featured": {
-          "type": "boolean"
-        },
-        "viewCount": {
-          "type": "string",
-          "format": "int64"
-        },
-        "updateAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "publishAt": {
-          "type": "string",
-          "format": "date-time"
         }
       }
     },
@@ -2969,6 +3106,18 @@
         }
       }
     },
+    "pbSubmitPostRequest": {
+      "type": "object",
+      "properties": {
+        "postIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
+        }
+      }
+    },
     "pbTag": {
       "type": "object",
       "properties": {
@@ -3055,6 +3204,33 @@
         },
         "followed": {
           "type": "boolean"
+        }
+      }
+    },
+    "pbUserItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        }
+      }
+    },
+    "pbWithdrawPostRequest": {
+      "type": "object",
+      "properties": {
+        "postIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          }
         }
       }
     },

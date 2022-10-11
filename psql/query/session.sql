@@ -10,8 +10,7 @@ DELETE FROM sessions
 WHERE id = @id::uuid AND user_id = @user_id::bigint;
 
 -- name: DeleteSessions :execrows
-DELETE FROM sessions
-WHERE id = ANY(@ids::uuid[]) AND user_id = @user_id::bigint;
+DELETE FROM sessions WHERE id = ANY(@ids::uuid[]);
 
 -- name: DeleteExpiredSessions :exec
 DELETE FROM sessions WHERE expires_at < now() - interval '30 days';
@@ -22,15 +21,16 @@ WHERE id = $1 LIMIT 1;
 
 -- name: ListSessions :many
 WITH Data_CTE AS (
-  SELECT id, user_agent, client_ip, expires_at, create_at
+  SELECT id, user_id, user_agent, client_ip, expires_at, create_at
   FROM sessions
-  WHERE user_id = @user_id::bigint
 ),
 Count_CTE AS (
   SELECT count(*) total FROM Data_CTE
 )
-SELECT * FROM Data_CTE
-CROSS JOIN Count_CTE
+SELECT dc.*, cnt.total, u.username, u.avatar 
+FROM Data_CTE dc
+CROSS JOIN Count_CTE cnt
+JOIN users u ON u.id = dc.user_id 
 ORDER BY
   CASE WHEN @client_ip_asc::bool THEN client_ip END ASC,
   CASE WHEN @client_ip_desc::bool THEN client_ip END DESC,

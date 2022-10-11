@@ -14,18 +14,17 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// CreatePost
+// ========================// CreatePost //======================== //
+
 func (server *Server) CreatePost(ctx context.Context, req *emptypb.Empty) (*pb.CreatePostResponse, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	arg := db.CreateNewPostParams{
 		AuthorID:   authUser.ID,
 		Title:      "",
-		Abstract:   "",
 		CoverImage: server.config.DefaultCover,
 		Content:    "",
 	}
@@ -39,16 +38,16 @@ func (server *Server) CreatePost(ctx context.Context, req *emptypb.Empty) (*pb.C
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// DeletePost
+// ========================// DeletePost //======================== //
+
 func (server *Server) DeletePost(ctx context.Context, req *pb.DeletePostRequest) (*emptypb.Empty, error) {
-	if err := util.ValidateID(req.GetPostId()); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.DeletePostParams{
@@ -57,29 +56,27 @@ func (server *Server) DeletePost(ctx context.Context, req *pb.DeletePostRequest)
 	}
 
 	if err := server.store.DeletePost(ctx, arg); err != nil {
-		return nil, status.Error(codes.Internal, "failed to delete posts")
+		return nil, status.Error(codes.Internal, "failed to delete post")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// UpdatePost
+// ========================// UpdatePost //======================== //
+
 func (server *Server) UpdatePost(ctx context.Context, req *pb.UpdatePostRequest) (*pb.UpdatePostResponse, error) {
-	if err := validateUpdatePostRequest(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if err := validateUpdatePostRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.UpdatePostParams{
 		ID:         req.GetPostId(),
 		AuthorID:   authUser.ID,
 		Title:      sql.NullString{String: req.GetTitle(), Valid: req.Title != nil},
-		Abstract:   sql.NullString{String: req.GetAbstract(), Valid: req.Abstract != nil},
 		CoverImage: sql.NullString{String: req.GetCoverImage(), Valid: req.CoverImage != nil},
 	}
 
@@ -138,39 +135,30 @@ func validateUpdatePostRequest(req *pb.UpdatePostRequest) error {
 	if err := util.ValidateID(req.GetPostId()); err != nil {
 		return fmt.Errorf("postID: %s", err.Error())
 	}
-
 	if req.Title != nil {
 		if err := util.ValidateString(req.GetTitle(), 1, 200); err != nil {
 			return fmt.Errorf("title: %s", err.Error())
 		}
 	}
-
-	if req.Abstract != nil {
-		if err := util.ValidateString(req.GetAbstract(), 1, 1000); err != nil {
-			return fmt.Errorf("abstract: %s", err.Error())
-		}
-	}
-
 	if req.CoverImage != nil {
 		if err := util.ValidateString(req.GetCoverImage(), 1, 100); err != nil {
 			return fmt.Errorf("coverImage: %s", err.Error())
 		}
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// SubmitPost
+// ========================// SubmitPost //======================== //
+
 func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest) (*emptypb.Empty, error) {
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
-	}
-
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	arg := db.UpdatePostStatusParams{
@@ -202,13 +190,16 @@ func (server *Server) SubmitPost(ctx context.Context, req *pb.SubmitPostRequest)
 	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some submissions failed")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// PublishPost
+// ========================// PublishPost //======================== //
+
 func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
@@ -242,13 +233,16 @@ func (server *Server) PublishPost(ctx context.Context, req *pb.PublishPostReques
 	if len(newPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some publications failed")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// WithdrawPost
+// ========================// WithdrawPost //======================== //
+
 func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	postIDs, err := util.ValidateRepeatedIDs(req.GetPostIds())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "postID: %s", err.Error())
@@ -282,13 +276,16 @@ func (server *Server) WithdrawPost(ctx context.Context, req *pb.WithdrawPostRequ
 	if len(withdrawPosts) != len(postIDs) {
 		return nil, status.Error(codes.Internal, "some withdrawal failed")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// UpdatePostLabel
+// ========================// UpdatePostLabel //======================== //
+
 func (server *Server) UpdatePostLabel(ctx context.Context, req *pb.UpdatePostLabelRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	categoryIDs, tagIDs, err := validateUpdatePostLabelRequest(req)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -323,7 +320,6 @@ func (server *Server) UpdatePostLabel(ctx context.Context, req *pb.UpdatePostLab
 			return nil, status.Error(codes.Internal, "failed to update post tags")
 		}
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
@@ -348,38 +344,23 @@ func validateUpdatePostLabelRequest(req *pb.UpdatePostLabelRequest) ([]int64, []
 		if tagIDs, err = util.ValidateRepeatedIDs(req.GetTagIds()); err != nil {
 			return nil, nil, fmt.Errorf("tagID: %s", err.Error())
 		}
-		if len(tagIDs) > 5 {
-			return nil, nil, fmt.Errorf("post should not have more than 5 tags")
+		if len(tagIDs) > 3 {
+			return nil, nil, fmt.Errorf("post should not have more than 3 tags")
 		}
 	}
-
 	return categoryIDs, tagIDs, nil
 }
 
-// -------------------------------------------------------------------
-// ListPosts
+// ========================// ListPosts //======================== //
+
 func (server *Server) ListPosts(ctx context.Context, req *pb.ListPostsRequest) (*pb.ListPostsResponse, error) {
-	options := []string{"publishAt", "updateAt", "viewCount"}
-	if err := util.ValidatePageOrder(req, options); err != nil {
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
+	if err := validateListPostsRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if req.Status != nil {
-		options = []string{"publish", "review", "revise", "draft"}
-		if err := util.ValidateOneOf(req.GetStatus(), options); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "status: %s", err.Error())
-		}
-	}
-
-	if req.Keyword != nil {
-		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "keyword: %s", err.Error())
-		}
-	}
-
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	arg := db.ListPostsParams{
@@ -403,20 +384,38 @@ func (server *Server) ListPosts(ctx context.Context, req *pb.ListPostsRequest) (
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list posts")
 	}
-
 	return convertListPosts(posts), nil
 }
 
-// -------------------------------------------------------------------
-// GetPost
+func validateListPostsRequest(req *pb.ListPostsRequest) error {
+	options := []string{"publishAt", "updateAt", "viewCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return err
+	}
+	if req.Status != nil {
+		options = []string{"publish", "review", "revise", "draft"}
+		if err := util.ValidateOneOf(req.GetStatus(), options); err != nil {
+			return fmt.Errorf("status: %s", err.Error())
+		}
+	}
+	if req.Keyword != nil {
+		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
+			return fmt.Errorf("keyword: %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// ========================// GetPost //======================== //
+
 func (server *Server) GetPost(ctx context.Context, req *pb.GetPostRequest) (*pb.GetPostResponse, error) {
-	if err := util.ValidateID(req.GetPostId()); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
+	authUser, gErr := server.grpcGuard(ctx, roleAuthor)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
 	}
 
 	arg := db.GetPostParams{
@@ -429,20 +428,28 @@ func (server *Server) GetPost(ctx context.Context, req *pb.GetPostRequest) (*pb.
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get post")
 	}
-
 	return convertGetPost(post), nil
 }
 
-// -------------------------------------------------------------------
-// GetPosts
+// ========================// GetFeaturedPosts //======================== //
+
+func (server *Server) GetFeaturedPosts(ctx context.Context, req *pb.GetFeaturedPostsRequest) (*pb.GetFeaturedPostsResponse, error) {
+	if err := util.ValidateNumber(int64(req.GetNum()), 1, 8); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "num: %s", err.Error())
+	}
+
+	posts, err := server.store.GetFeaturedPosts(ctx, req.GetNum())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get featured posts")
+	}
+	return convertFeaturedPosts(posts), nil
+}
+
+// ========================// GetPosts //======================== //
+
 func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*pb.GetPostsResponse, error) {
 	if err := validateGetPostsRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
 	}
 
 	arg := db.GetPostsParams{
@@ -452,7 +459,6 @@ func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*p
 		PublishAtDesc: req.GetOrderBy() == "publishAt" && req.GetOrder() == "desc",
 		ViewCountAsc:  req.GetOrderBy() == "viewCount" && req.GetOrder() == "asc",
 		ViewCountDesc: req.GetOrderBy() == "viewCount" && req.GetOrder() == "desc",
-		SelfID:        authUser.ID,
 		AnyFeatured:   req.Featured == nil,
 		Featured:      req.GetFeatured(),
 		AnyAuthor:     req.AuthorId == nil,
@@ -469,7 +475,6 @@ func (server *Server) GetPosts(ctx context.Context, req *pb.GetPostsRequest) (*p
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list posts")
 	}
-
 	return convertGetPosts(posts), nil
 }
 
@@ -478,40 +483,35 @@ func validateGetPostsRequest(req *pb.GetPostsRequest) error {
 	if err := util.ValidatePageOrder(req, options); err != nil {
 		return err
 	}
-
 	if req.AuthorId != nil {
 		if err := util.ValidateID(req.GetAuthorId()); err != nil {
 			return fmt.Errorf("authorId: %s", err.Error())
 		}
 	}
-
 	if req.CategoryId != nil {
 		if err := util.ValidateID(req.GetCategoryId()); err != nil {
 			return fmt.Errorf("categoryId: %s", err.Error())
 		}
 	}
-
 	if req.TagId != nil {
 		if err := util.ValidateID(req.GetTagId()); err != nil {
 			return fmt.Errorf("tagId: %s", err.Error())
 		}
 	}
-
 	if req.Keyword != nil {
 		if err := util.ValidateString(req.GetKeyword(), 1, 50); err != nil {
 			return fmt.Errorf("keyword: %s", err.Error())
 		}
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// ReadPost
+// ========================// ReadPost //======================== //
+
 func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*pb.ReadPostResponse, error) {
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
+	authUser, gErr := server.grpcGuard(ctx, roleGhost)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	if err := util.ValidateID(req.GetPostId()); err != nil {
@@ -527,16 +527,15 @@ func (server *Server) ReadPost(ctx context.Context, req *pb.ReadPostRequest) (*p
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to read post")
 	}
-
 	return convertReadPost(post), nil
 }
 
-// -------------------------------------------------------------------
-// StarPost
+// ========================// StarPost //======================== //
+
 func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	postID := req.GetPostId()
@@ -561,6 +560,5 @@ func (server *Server) StarPost(ctx context.Context, req *pb.StarPostRequest) (*e
 			return nil, status.Error(codes.Internal, "failed to delete post star")
 		}
 	}
-
 	return &emptypb.Empty{}, nil
 }

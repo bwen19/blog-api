@@ -14,9 +14,13 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// CreateUser
+// ========================// CreateUser //======================== //
+
 func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := validateCreateUserRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -52,28 +56,24 @@ func validateCreateUserRequest(req *pb.CreateUserRequest) error {
 	if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
 		return fmt.Errorf("username: %s", err.Error())
 	}
-
 	if err := util.ValidateEmail(req.GetEmail()); err != nil {
 		return fmt.Errorf("email: %s", err.Error())
 	}
-
 	if err := util.ValidateString(req.GetPassword(), 6, 50); err != nil {
 		return fmt.Errorf("password: %s", err.Error())
 	}
-
 	if err := util.ValidateOneOf(req.GetRole(), []string{"admin", "author", "user"}); err != nil {
 		return fmt.Errorf("role: %s", err.Error())
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// DeleteUsers
+// ========================// DeleteUsers //======================== //
+
 func (server *Server) DeleteUsers(ctx context.Context, req *pb.DeleteUsersRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleAdmin)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	userIDs, err := util.ValidateRepeatedIDs(req.GetUserIds())
@@ -95,11 +95,15 @@ func (server *Server) DeleteUsers(ctx context.Context, req *pb.DeleteUsersReques
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// UpdateUser
+// ========================// UpdateUser //======================== //
+
 func (server *Server) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := validateUpdateUserRequest(req); err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.UpdateUserParams{
@@ -134,38 +138,37 @@ func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
 	if err := util.ValidateID(req.GetUserId()); err != nil {
 		return fmt.Errorf("userId: %s", err.Error())
 	}
-
 	if req.Username != nil {
 		if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
 			return fmt.Errorf("username: %s", err.Error())
 		}
 	}
-
 	if req.Email != nil {
 		if err := util.ValidateEmail(req.GetEmail()); err != nil {
 			return fmt.Errorf("email: %s", err.Error())
 		}
 	}
-
 	if req.Password != nil {
 		if err := util.ValidateString(req.GetPassword(), 6, 50); err != nil {
 			return fmt.Errorf("password: %s", err.Error())
 		}
 	}
-
 	if req.Role != nil {
 		if err := util.ValidateOneOf(req.GetRole(), []string{"admin", "author", "user"}); err != nil {
 			return fmt.Errorf("role: %s", err.Error())
 		}
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// ListUsers
+// ========================// ListUsers //======================== //
+
 func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
-	options := []string{"username", "role", "isDeleted", "createAt"}
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
+	options := []string{"username", "role", "deleted", "createAt"}
 	if err := util.ValidatePageOrder(req, options); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -183,8 +186,8 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		UsernameDesc: req.GetOrderBy() == "username" && req.GetOrder() == "desc",
 		RoleAsc:      req.GetOrderBy() == "role" && req.GetOrder() == "asc",
 		RoleDesc:     req.GetOrderBy() == "role" && req.GetOrder() == "desc",
-		DeletedAsc:   req.GetOrderBy() == "isDeleted" && req.GetOrder() == "asc",
-		DeletedDesc:  req.GetOrderBy() == "isDeleted" && req.GetOrder() == "desc",
+		DeletedAsc:   req.GetOrderBy() == "deleted" && req.GetOrder() == "asc",
+		DeletedDesc:  req.GetOrderBy() == "deleted" && req.GetOrder() == "desc",
 		CreateAtAsc:  req.GetOrderBy() == "createAt" && req.GetOrder() == "asc",
 		CreateAtDesc: req.GetOrderBy() == "createAt" && req.GetOrder() == "desc",
 		AnyKeyword:   req.Keyword == nil,
@@ -199,17 +202,18 @@ func (server *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 	return convertListUsers(users), nil
 }
 
-// -------------------------------------------------------------------
-// ChangeProfile
+// ========================// ChangeProfile //======================== //
+
 func (server *Server) ChangeProfile(ctx context.Context, req *pb.ChangeProfileRequest) (*pb.ChangeProfileResponse, error) {
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := validateChangeProfileRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
-	}
 	if authUser.ID != req.GetUserId() {
 		return nil, status.Error(codes.PermissionDenied, "no permission to change this user")
 	}
@@ -234,38 +238,34 @@ func validateChangeProfileRequest(req *pb.ChangeProfileRequest) error {
 	if err := util.ValidateID(req.GetUserId()); err != nil {
 		return fmt.Errorf("userId: %s", err.Error())
 	}
-
 	if req.Username != nil {
 		if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
 			return fmt.Errorf("username: %s", err.Error())
 		}
 	}
-
 	if req.Email != nil {
 		if err := util.ValidateEmail(req.GetEmail()); err != nil {
 			return fmt.Errorf("email: %s", err.Error())
 		}
 	}
-
 	if req.Intro != nil {
 		if err := util.ValidateString(req.GetIntro(), 1, 150); err != nil {
 			return fmt.Errorf("intro: %s", err.Error())
 		}
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// ChangePassword
+// ========================// ChangePassword //======================== //
+
 func (server *Server) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*emptypb.Empty, error) {
-	if err := validateChangePasswordRequest(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if err := validateChangePasswordRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if authUser.ID != req.GetUserId() {
@@ -297,24 +297,21 @@ func validateChangePasswordRequest(req *pb.ChangePasswordRequest) error {
 	if err := util.ValidateID(req.GetUserId()); err != nil {
 		return fmt.Errorf("userId: %s", err.Error())
 	}
-
 	if err := util.ValidateString(req.GetOldPassword(), 6, 50); err != nil {
 		return fmt.Errorf("oldPassword: %s", err.Error())
 	}
-
 	if err := util.ValidateString(req.GetNewPassword(), 6, 50); err != nil {
 		return fmt.Errorf("newPassword: %s", err.Error())
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// GetUserProfile
+// ========================// GetUserProfile //======================== //
+
 func (server *Server) GetUserProfile(ctx context.Context, req *pb.GetUserProfileRequest) (*pb.GetUserProfileResponse, error) {
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
+	authUser, gErr := server.grpcGuard(ctx, roleGhost)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	if err := util.ValidateID(req.GetUserId()); err != nil {
