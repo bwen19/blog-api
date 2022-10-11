@@ -9,7 +9,7 @@ import (
 )
 
 func createRandomCategory(t *testing.T) Category {
-	name := util.RandomString(7)
+	name := util.RandomString(6)
 
 	category, err := testStore.CreateCategory(context.Background(), name)
 	require.NoError(t, err)

@@ -10,12 +10,14 @@ import (
 	"github.com/bwen19/blog/util"
 	"github.com/lib/pq"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// Register
+// ========================// Register //======================== //
+
 func (server *Server) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	if err := validateRegisterRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -53,41 +55,29 @@ func validateRegisterRequest(req *pb.RegisterRequest) error {
 	if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
 		return fmt.Errorf("username: %s", err.Error())
 	}
-
 	if err := util.ValidateEmail(req.GetEmail()); err != nil {
 		return fmt.Errorf("email: %s", err.Error())
 	}
-
 	if err := util.ValidateString(req.GetPassword(), 6, 50); err != nil {
 		return fmt.Errorf("password: %s", err.Error())
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// Login
+// ========================// Login //======================== //
+
 func (server *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	if err := util.ValidateString(req.GetPassword(), 6, 50); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "password: %s", err.Error())
+	if err := validateLoginRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	var user db.User
 	var err error
-
 	switch req.GetPayload().(type) {
 	case *(pb.LoginRequest_Username):
-		if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "username: %s", err.Error())
-		}
 		user, err = server.store.GetUserByUsername(ctx, req.GetUsername())
 	case *(pb.LoginRequest_Email):
-		if err := util.ValidateEmail(req.GetEmail()); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "email: %s", err.Error())
-		}
 		user, err = server.store.GetUserByEmail(ctx, req.GetEmail())
-	default:
-		return nil, status.Error(codes.InvalidArgument, "username or email is not provided")
 	}
 
 	if err != nil {
@@ -101,8 +91,7 @@ func (server *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 		return nil, status.Error(codes.NotFound, "this user is inactive")
 	}
 
-	err = util.CheckPassword(req.Password, user.HashedPassword)
-	if err != nil {
+	if err = util.CheckPassword(req.Password, user.HashedPassword); err != nil {
 		return nil, status.Error(codes.NotFound, "incorrect password")
 	}
 
@@ -122,13 +111,13 @@ func (server *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 		return nil, status.Error(codes.Internal, "failed to create refresh token")
 	}
 
-	mtdt := server.extractMetadata(ctx)
+	UserAgent, ClientIp := extractLoginInfo(ctx)
 	arg := db.CreateSessionParams{
 		ID:           refreshPayload.ID,
 		UserID:       refreshPayload.UserID,
 		RefreshToken: refreshToken,
-		UserAgent:    mtdt.UserAgent,
-		ClientIp:     mtdt.ClientIp,
+		UserAgent:    UserAgent,
+		ClientIp:     ClientIp,
 		ExpiresAt:    refreshPayload.ExpiredAt,
 	}
 	if _, err = server.store.CreateSession(ctx, arg); err != nil {
@@ -149,8 +138,43 @@ func (server *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// AutoLogin
+func validateLoginRequest(req *pb.LoginRequest) error {
+	switch req.GetPayload().(type) {
+	case *(pb.LoginRequest_Username):
+		if err := util.ValidateString(req.GetUsername(), 3, 50); err != nil {
+			return fmt.Errorf("username: %s", err.Error())
+		}
+	case *(pb.LoginRequest_Email):
+		if err := util.ValidateEmail(req.GetEmail()); err != nil {
+			return fmt.Errorf("email: %s", err.Error())
+		}
+	default:
+		return fmt.Errorf("username or email is not provided")
+	}
+	if err := util.ValidateString(req.GetPassword(), 6, 50); err != nil {
+		return fmt.Errorf("password: %s", err.Error())
+	}
+	return nil
+}
+
+func extractLoginInfo(ctx context.Context) (string, string) {
+	var UserAgent, ClientIp string
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if userAgents := md.Get("grpcgateway-user-agent"); len(userAgents) > 0 {
+			UserAgent = userAgents[0]
+		}
+		if clientIPs := md.Get("x-forwarded-for"); len(clientIPs) > 0 {
+			ClientIp = clientIPs[0]
+		}
+	}
+	if p, ok := peer.FromContext(ctx); ok {
+		ClientIp = p.Addr.String()
+	}
+	return UserAgent, ClientIp
+}
+
+// ========================// AutoLogin //======================== //
+
 func (server *Server) AutoLogin(ctx context.Context, req *pb.AutoLoginRequest) (*pb.AutoLoginResponse, error) {
 	refreshPayload, user, err := server.checkRefreshToken(ctx, req.GetRefreshToken())
 	if err != nil {
@@ -178,8 +202,8 @@ func (server *Server) AutoLogin(ctx context.Context, req *pb.AutoLoginRequest) (
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// Refresh
+// ========================// Refresh //======================== //
+
 func (server *Server) Refresh(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
 	refreshPayload, _, err := server.checkRefreshToken(ctx, req.GetRefreshToken())
 	if err != nil {
@@ -198,8 +222,8 @@ func (server *Server) Refresh(ctx context.Context, req *pb.RefreshTokenRequest) 
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// Logout
+// ========================// Logout //======================== //
+
 func (server *Server) Logout(ctx context.Context, req *pb.LogoutRequest) (*emptypb.Empty, error) {
 	refreshPayload, _, err := server.checkRefreshToken(ctx, req.GetRefreshToken())
 	if err != nil {
@@ -210,19 +234,15 @@ func (server *Server) Logout(ctx context.Context, req *pb.LogoutRequest) (*empty
 		ID:     refreshPayload.ID,
 		UserID: refreshPayload.UserID,
 	}
-	err = server.store.DeleteSession(ctx, arg)
-	if err != nil {
+	if err = server.store.DeleteSession(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete session")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// Utils
-// -------------------------------------------------------------------
+// ========================// UTILS //======================== //
 
-// Check refresh token
+// checkRefreshToken
 func (server *Server) checkRefreshToken(ctx context.Context, refreshToken string) (*util.Payload, *db.User, error) {
 	if refreshToken == "" {
 		return nil, nil, fmt.Errorf("refreshToken: must be a non empty string")
@@ -250,14 +270,13 @@ func (server *Server) checkRefreshToken(ctx context.Context, refreshToken string
 	user, err := server.store.GetUser(ctx, refreshPayload.UserID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, status.Error(codes.NotFound, "user not found")
+			return nil, nil, fmt.Errorf("user not found")
 		}
-		return nil, nil, status.Error(codes.Internal, "failed to get user")
+		return nil, nil, fmt.Errorf("failed to get user")
 	}
 
 	if user.Deleted {
-		return nil, nil, status.Error(codes.NotFound, "this user is inactive")
+		return nil, nil, fmt.Errorf("this user is inactive")
 	}
-
 	return refreshPayload, &user, nil
 }

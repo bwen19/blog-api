@@ -12,7 +12,7 @@ redis:
 	docker run --name redis --network "$(NETWORK)" -p 6379:6379 -d redis:alpine3.16
 
 postgres:
-	docker run --name postgres --network "$(NETWORK)" -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:alpine
+	docker run --name postgres --network "$(NETWORK)" -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -d postgres:14.5-alpine3.16
 
 createdb:
 	docker exec -it postgres createdb --username=root --owner=root blog
@@ -30,11 +30,11 @@ migratedown:
 	migrate -path psql/migration -database "$(DB_URL)" -verbose down
 
 sqlc:
-	cmd /C del psql\db\\*.sql.go
-	docker run --rm -v D:\project\webapp\blog\server:/src -w /src kjconroy/sqlc generate
+	rm -f psql/db/*.sql.go
+	sqlc generate
 
 proto:
-	cmd /C del grpc\pb\\*.go
+	rm -f grpc/pb/*.pb.go
 	protoc --proto_path=grpc/proto --go_out=grpc/pb --go_opt=paths=source_relative \
 		--go-grpc_out=grpc/pb --go-grpc_opt=paths=source_relative \
 		--grpc-gateway_out=grpc/pb \
@@ -42,7 +42,7 @@ proto:
 		--openapiv2_out=grpc/swagger \
 		--openapiv2_opt=allow_merge=true,merge_file_name=blog,allow_delete_body=true \
 		grpc/proto/*.proto
-	cmd /C del grpc\statik\\*.go
+	rm -f grpc/statik/statik.go
 	statik -src=grpc/swagger -dest=grpc
 
 test:

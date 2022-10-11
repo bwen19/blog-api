@@ -77,17 +77,11 @@ func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) er
 }
 
 const deleteSessions = `-- name: DeleteSessions :execrows
-DELETE FROM sessions
-WHERE id = ANY($1::uuid[]) AND user_id = $2::bigint
+DELETE FROM sessions WHERE id = ANY($1::uuid[])
 `
 
-type DeleteSessionsParams struct {
-	Ids    []uuid.UUID `json:"ids"`
-	UserID int64       `json:"user_id"`
-}
-
-func (q *Queries) DeleteSessions(ctx context.Context, arg DeleteSessionsParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteSessions, pq.Array(arg.Ids), arg.UserID)
+func (q *Queries) DeleteSessions(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteSessions, pq.Array(ids))
 	if err != nil {
 		return 0, err
 	}
@@ -116,15 +110,16 @@ func (q *Queries) GetSession(ctx context.Context, id uuid.UUID) (Session, error)
 
 const listSessions = `-- name: ListSessions :many
 WITH Data_CTE AS (
-  SELECT id, user_agent, client_ip, expires_at, create_at
+  SELECT id, user_id, user_agent, client_ip, expires_at, create_at
   FROM sessions
-  WHERE user_id = $9::bigint
 ),
 Count_CTE AS (
   SELECT count(*) total FROM Data_CTE
 )
-SELECT id, user_agent, client_ip, expires_at, create_at, total FROM Data_CTE
-CROSS JOIN Count_CTE
+SELECT dc.id, dc.user_id, dc.user_agent, dc.client_ip, dc.expires_at, dc.create_at, cnt.total, u.username, u.avatar 
+FROM Data_CTE dc
+CROSS JOIN Count_CTE cnt
+JOIN users u ON u.id = dc.user_id 
 ORDER BY
   CASE WHEN $3::bool THEN client_ip END ASC,
   CASE WHEN $4::bool THEN client_ip END DESC,
@@ -145,16 +140,18 @@ type ListSessionsParams struct {
 	CreateAtDesc  bool  `json:"create_at_desc"`
 	ExpiresAtAsc  bool  `json:"expires_at_asc"`
 	ExpiresAtDesc bool  `json:"expires_at_desc"`
-	UserID        int64 `json:"user_id"`
 }
 
 type ListSessionsRow struct {
 	ID        uuid.UUID `json:"id"`
+	UserID    int64     `json:"user_id"`
 	UserAgent string    `json:"user_agent"`
 	ClientIp  string    `json:"client_ip"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreateAt  time.Time `json:"create_at"`
 	Total     int64     `json:"total"`
+	Username  string    `json:"username"`
+	Avatar    string    `json:"avatar"`
 }
 
 func (q *Queries) ListSessions(ctx context.Context, arg ListSessionsParams) ([]ListSessionsRow, error) {
@@ -167,7 +164,6 @@ func (q *Queries) ListSessions(ctx context.Context, arg ListSessionsParams) ([]L
 		arg.CreateAtDesc,
 		arg.ExpiresAtAsc,
 		arg.ExpiresAtDesc,
-		arg.UserID,
 	)
 	if err != nil {
 		return nil, err
@@ -178,11 +174,14 @@ func (q *Queries) ListSessions(ctx context.Context, arg ListSessionsParams) ([]L
 		var i ListSessionsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.UserID,
 			&i.UserAgent,
 			&i.ClientIp,
 			&i.ExpiresAt,
 			&i.CreateAt,
 			&i.Total,
+			&i.Username,
+			&i.Avatar,
 		); err != nil {
 			return nil, err
 		}

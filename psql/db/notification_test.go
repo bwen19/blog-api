@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createRandomNotif(t *testing.T, user User) {
+func createRandomNotif(t *testing.T, userID int64) {
 	arg := CreateNotificationParams{
-		UserID:  user.ID,
+		UserID:  userID,
 		Kind:    "system",
 		Title:   util.RandomString(10),
 		Content: util.RandomString(30),
@@ -22,14 +22,14 @@ func createRandomNotif(t *testing.T, user User) {
 
 func TestCreateNotif(t *testing.T) {
 	user := createRandomUser(t)
-	createRandomNotif(t, user)
+	createRandomNotif(t, user.ID)
 }
 
 func TestDeleteNotifs(t *testing.T) {
 	user := createRandomUser(t)
 
 	for i := 0; i < 5; i++ {
-		createRandomNotif(t, user)
+		createRandomNotif(t, user.ID)
 	}
 
 	err := testStore.MarkAllRead(context.Background(), user.ID)
@@ -66,7 +66,7 @@ func TestDeleteNotifs(t *testing.T) {
 func TestListNotifications(t *testing.T) {
 	user := createRandomUser(t)
 	for i := 0; i < 5; i++ {
-		createRandomNotif(t, user)
+		createRandomNotif(t, user.ID)
 	}
 
 	arg := ListNotificationsParams{

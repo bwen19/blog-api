@@ -14,16 +14,16 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// CreateComment
+// ========================// CreateComment //======================== //
+
 func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRequest) (*pb.CreateCommentResponse, error) {
-	if err := validateCreateCommentRequest(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	if err := validateCreateCommentRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.CreateCommentParams{
@@ -54,7 +54,7 @@ func (server *Server) CreateComment(ctx context.Context, req *pb.CreateCommentRe
 		log.Println("failed to create new notification for post comment")
 	}
 
-	rsp := convertCreateComment(comment, authUser.User)
+	rsp := convertCreateComment(comment, authUser)
 	return rsp, nil
 }
 
@@ -62,41 +62,36 @@ func validateCreateCommentRequest(req *pb.CreateCommentRequest) error {
 	if err := util.ValidateID(req.GetPostId()); err != nil {
 		return fmt.Errorf("postId: %s", err.Error())
 	}
-
 	if req.ParentId != nil {
 		if err := util.ValidateID(req.GetParentId()); err != nil {
 			return fmt.Errorf("parentId: %s", err.Error())
 		}
 	}
-
 	if req.ReplyUserId != nil {
 		if err := util.ValidateID(req.GetReplyUserId()); err != nil {
 			return fmt.Errorf("replyUserId: %s", err.Error())
 		}
 	}
-
 	if err := util.ValidateString(req.GetContent(), 1, 500); err != nil {
 		return fmt.Errorf("content: %s", err.Error())
 	}
-
 	return nil
 }
 
-// -------------------------------------------------------------------
-// DeleteComment
+// ========================// DeleteComment //======================== //
+
 func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	commentID := req.GetCommentId()
-	if err := util.ValidateID(commentID); err != nil {
+	if err := util.ValidateID(req.GetCommentId()); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
 	}
 
 	arg := db.DeleteCommentParams{
-		ID:      commentID,
+		ID:      req.GetCommentId(),
 		IsAdmin: authUser.Role == "admin",
 		UserID:  authUser.ID,
 	}
@@ -104,25 +99,19 @@ func (server *Server) DeleteComment(ctx context.Context, req *pb.DeleteCommentRe
 	if err := server.store.DeleteComment(ctx, arg); err != nil {
 		return nil, status.Error(codes.Internal, "failed to delete comment")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// ListComments
+// ========================// ListComments //======================== //
+
 func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequest) (*pb.ListCommentsResponse, error) {
-	options := []string{"createAt", "starCount"}
-	if err := util.ValidatePageOrder(req, options); err != nil {
+	authUser, gErr := server.grpcGuard(ctx, roleGhost)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
+	if err := validateListCommentsRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if err := util.ValidateID(req.GetPostId()); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
-	}
-
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
 	}
 
 	arg := db.ListCommentsParams{
@@ -140,25 +129,30 @@ func (server *Server) ListComments(ctx context.Context, req *pb.ListCommentsRequ
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
-
 	return convertListComments(comments), nil
 }
 
-// -------------------------------------------------------------------
-// ListReplies
-func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesRequest) (*pb.ListRepliesResponse, error) {
+func validateListCommentsRequest(req *pb.ListCommentsRequest) error {
 	options := []string{"createAt", "starCount"}
 	if err := util.ValidatePageOrder(req, options); err != nil {
+		return err
+	}
+	if err := util.ValidateID(req.GetPostId()); err != nil {
+		return fmt.Errorf("postId: %s", err.Error())
+	}
+	return nil
+}
+
+// ========================// ListReplies //======================== //
+
+func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesRequest) (*pb.ListRepliesResponse, error) {
+	authUser, gErr := server.grpcGuard(ctx, roleGhost)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
+	if err := validateListRepliesRequest(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	if err := util.ValidateID(req.GetCommentId()); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "postId: %s", err.Error())
-	}
-
-	var authUser AuthUser
-	if user, ok := ctx.Value(authUserKey{}).(AuthUser); ok {
-		authUser = user
 	}
 
 	arg := db.ListRepliesParams{
@@ -176,26 +170,35 @@ func (server *Server) ListReplies(ctx context.Context, req *pb.ListRepliesReques
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get comment list")
 	}
-
 	return convertListReplies(replies), nil
 }
 
-// -------------------------------------------------------------------
-// StarComment
+func validateListRepliesRequest(req *pb.ListRepliesRequest) error {
+	options := []string{"createAt", "starCount"}
+	if err := util.ValidatePageOrder(req, options); err != nil {
+		return err
+	}
+	if err := util.ValidateID(req.GetCommentId()); err != nil {
+		return fmt.Errorf("postId: %s", err.Error())
+	}
+	return nil
+}
+
+// ========================// StarComment //======================== //
+
 func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	commentID := req.GetCommentId()
-	if err := util.ValidateID(commentID); err != nil {
+	if err := util.ValidateID(req.GetCommentId()); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "commentId: %s", err.Error())
 	}
 
 	if req.GetLike() {
 		arg := db.CreateCommentStarParams{
-			CommentID: commentID,
+			CommentID: req.GetCommentId(),
 			UserID:    authUser.ID,
 		}
 		if err := server.store.CreateCommentStar(ctx, arg); err != nil {
@@ -203,13 +206,12 @@ func (server *Server) StarComment(ctx context.Context, req *pb.StarCommentReques
 		}
 	} else {
 		arg := db.DeleteCommentStarParams{
-			CommentID: commentID,
+			CommentID: req.GetCommentId(),
 			UserID:    authUser.ID,
 		}
 		if err := server.store.DeleteCommentStar(ctx, arg); err != nil {
 			return nil, status.Error(codes.Internal, "failed to delete comment star")
 		}
 	}
-
 	return &emptypb.Empty{}, nil
 }

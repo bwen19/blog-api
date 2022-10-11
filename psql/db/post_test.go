@@ -10,7 +10,8 @@ import (
 )
 
 func TestDeletePosts(t *testing.T) {
-	post1 := createRandomPost(t)
+	user := createRandomUser(t)
+	post1 := createRandomPost(t, user)
 
 	arg := DeletePostParams{
 		ID:       post1.ID,
@@ -32,7 +33,8 @@ func TestDeletePosts(t *testing.T) {
 }
 
 func TestUpdatePost(t *testing.T) {
-	post1 := createRandomPost(t)
+	user := createRandomUser(t)
+	post1 := createRandomPost(t, user)
 
 	arg := UpdatePostParams{
 		ID:       post1.ID,
@@ -58,7 +60,8 @@ func TestUpdatePost(t *testing.T) {
 }
 
 func TestNotUpdatePost(t *testing.T) {
-	post1 := createRandomPost(t)
+	user := createRandomUser(t)
+	post1 := createRandomPost(t, user)
 
 	arg := UpdatePostParams{
 		ID:       post1.ID,
@@ -75,7 +78,8 @@ func TestNotUpdatePost(t *testing.T) {
 }
 
 func TestUpdatePostStatus(t *testing.T) {
-	post1 := createRandomPost(t)
+	user := createRandomUser(t)
+	post1 := createRandomPost(t, user)
 
 	arg := UpdatePostStatusParams{
 		Ids:       []int64{post1.ID},
@@ -103,8 +107,9 @@ func TestUpdatePostStatus(t *testing.T) {
 }
 
 func TestListPosts(t *testing.T) {
+	user := createRandomUser(t)
 	for i := 0; i < 5; i++ {
-		createRandomPost(t)
+		createRandomPost(t, user)
 	}
 
 	arg := ListPostsParams{
@@ -120,10 +125,44 @@ func TestListPosts(t *testing.T) {
 	require.Equal(t, len(posts), 5)
 }
 
-func TestGetPosts(t *testing.T) {
+func TestGetFeaturedPosts(t *testing.T) {
+	user := createRandomUser(t)
 	postIDs := []int64{}
-	for i := 0; i < 5; i++ {
-		post := createRandomPost(t)
+	for i := 0; i < 10; i++ {
+		post := createRandomPost(t, user)
+		postIDs = append(postIDs, post.ID)
+	}
+
+	arg1 := UpdatePostStatusParams{
+		Ids:       postIDs,
+		OldStatus: []string{"draft"},
+		Status:    "publish",
+		IsAdmin:   true,
+	}
+	p, err := testStore.UpdatePostStatus(context.Background(), arg1)
+	require.NoError(t, err)
+	require.NotEmpty(t, p)
+
+	for _, postID := range postIDs {
+		arg := UpdatePostFeatureParams{
+			ID:       postID,
+			Featured: true,
+		}
+		err := testStore.UpdatePostFeature(context.Background(), arg)
+		require.NoError(t, err)
+	}
+
+	posts, err := testStore.GetFeaturedPosts(context.Background(), 4)
+	require.NoError(t, err)
+	require.NotEmpty(t, posts)
+	require.Equal(t, 4, len(posts))
+}
+
+func TestGetPosts(t *testing.T) {
+	user := createRandomUser(t)
+	postIDs := []int64{}
+	for i := 0; i < 10; i++ {
+		post := createRandomPost(t, user)
 		postIDs = append(postIDs, post.ID)
 	}
 
@@ -139,7 +178,6 @@ func TestGetPosts(t *testing.T) {
 
 	arg := GetPostsParams{
 		Limit:        5,
-		SelfID:       0,
 		AnyFeatured:  true,
 		AnyAuthor:    true,
 		AnyCategory:  true,
@@ -168,7 +206,6 @@ func TestGetPosts(t *testing.T) {
 
 	arg = GetPostsParams{
 		Limit:        3,
-		SelfID:       0,
 		Featured:     true,
 		AnyAuthor:    true,
 		AnyCategory:  true,
@@ -184,7 +221,8 @@ func TestGetPosts(t *testing.T) {
 }
 
 func TestReadPost(t *testing.T) {
-	post := createRandomPost(t)
+	user := createRandomUser(t)
+	post := createRandomPost(t, user)
 	arg1 := UpdatePostStatusParams{
 		Ids:       []int64{post.ID},
 		OldStatus: []string{"draft"},

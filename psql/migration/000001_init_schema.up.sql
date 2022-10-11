@@ -1,6 +1,6 @@
 -- SQL dump generated using DBML (dbml-lang.org)
 -- Database: PostgreSQL
--- Generated at: 2022-09-15T13:01:26.737Z
+-- Generated at: 2022-09-18T07:15:58.768Z
 
 CREATE TABLE "users" (
   "id" bigserial PRIMARY KEY,
@@ -45,7 +45,6 @@ CREATE TABLE "posts" (
   "id" bigserial PRIMARY KEY,
   "author_id" bigint NOT NULL,
   "title" varchar NOT NULL,
-  "abstract" text NOT NULL,
   "cover_image" varchar NOT NULL,
   "status" varchar NOT NULL DEFAULT 'draft',
   "featured" boolean NOT NULL DEFAULT false,

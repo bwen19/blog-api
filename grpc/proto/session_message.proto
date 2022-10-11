@@ -3,27 +3,30 @@ syntax = "proto3";
 package pb;
 
 import "google/protobuf/timestamp.proto";
+import "common_message.proto";
 
 option go_package = "github.com/bwen19/blog/grpc/pb";
 
 message DeleteSessionsRequest {
-    repeated string session_ids = 1;
+  repeated string session_ids = 1;
 }
 
 message ListSessionsRequest {
-    int32 page_id = 1;
-    int32 page_size = 2;
-    string order = 3;
-    string order_by = 4;
+  int32 page_id = 1;
+  int32 page_size = 2;
+  string order = 3;
+  string order_by = 4;
 }
+
 message ListSessionsResponse {
-    message SessionItem {
-        string id = 1;
-        string user_agent = 2;
-        string client_ip = 3;
-        google.protobuf.Timestamp create_at = 4;
-        google.protobuf.Timestamp expires_at = 5;
-    }
-    int64 total = 1;
-    repeated SessionItem sessions = 2;
+  message SessionItem {
+    string id = 1;
+    UserItem user = 2;
+    string user_agent = 3;
+    string client_ip = 4;
+    google.protobuf.Timestamp create_at = 5;
+    google.protobuf.Timestamp expires_at = 6;
+  }
+  int64 total = 1;
+  repeated SessionItem sessions = 2;
 }

@@ -139,13 +139,6 @@ service Blog {
             put: "/api/notification/read"
         };
     }
-    // LeaveMessage
-    rpc LeaveMessage (LeaveMessageRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            post: "/api/notification"
-            body: "*"
-        };
-    }
     // DeleteNotifs
     rpc DeleteNotifs (DeleteNotifsRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
@@ -159,6 +152,13 @@ service Blog {
             get: "/api/notification"
         };
     }
+    // LeaveMessage
+    rpc LeaveMessage (LeaveMessageRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/api/notification"
+            body: "*"
+        };
+    }
     // ListMessages
     rpc ListMessages (ListMessagesRequest) returns (ListMessagesResponse) {
         option (google.api.http) = {
@@ -169,6 +169,14 @@ service Blog {
     rpc CheckMessages (CheckMessagesRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             put: "/api/notification/admin"
+            body: "*"
+        };
+    }
+    // DeleteMessages
+    rpc DeleteMessages (DeleteMessagesRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            delete: "/api/notification/admin"
+            body: "*"
         };
     }
 
@@ -196,8 +204,7 @@ service Blog {
     // DeletePost
     rpc DeletePost (DeletePostRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
-            delete: "/api/post"
-            body: "*"
+            delete: "/api/post/{post_id}"
         };
     }
     // UpdatePost
@@ -211,18 +218,21 @@ service Blog {
     rpc SubmitPost (SubmitPostRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             post: "/api/post/submit"
+            body: "*"
         };
     }
     // PublishPost
     rpc PublishPost (PublishPostRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             post: "/api/post/publish"
+            body: "*"
         };
     }
     // WithdrawPost
     rpc WithdrawPost (WithdrawPostRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             post: "/api/post/withdraw"
+            body: "*"
         };
     }
     // UpdatePostLabel
@@ -235,13 +245,19 @@ service Blog {
     // ListPosts
     rpc ListPosts (ListPostsRequest) returns (ListPostsResponse) {
         option (google.api.http) = {
-            get: "/api/post/list"
+            get: "/api/posts"
         };
     }
     // GetPost
     rpc GetPost (GetPostRequest) returns (GetPostResponse) {
         option (google.api.http) = {
             get: "/api/post/{post_id}"
+        };
+    }
+    // GetFeaturedPosts
+    rpc GetFeaturedPosts (GetFeaturedPostsRequest) returns (GetFeaturedPostsResponse) {
+        option (google.api.http) = {
+            get: "/api/postft"
         };
     }
     // GetPosts
@@ -360,7 +376,7 @@ service Blog {
     // StarComment
     rpc StarComment (StarCommentRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
-            put: "/api/comment/star"
+            post: "/api/comment/star"
             body: "*"
         };
     }

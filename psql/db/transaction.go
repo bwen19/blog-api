@@ -8,7 +8,6 @@ import (
 type CreateNewPostParams struct {
 	AuthorID   int64  `json:"author_id"`
 	Title      string `json:"title"`
-	Abstract   string `json:"abstract"`
 	CoverImage string `json:"cover_image"`
 	Content    string `json:"content"`
 }
@@ -17,7 +16,6 @@ type CreateNewPostRow struct {
 	ID         int64     `json:"id"`
 	AuthorID   int64     `json:"author_id"`
 	Title      string    `json:"title"`
-	Abstract   string    `json:"abstract"`
 	CoverImage string    `json:"cover_image"`
 	Content    string    `json:"content"`
 	Status     string    `json:"status"`
@@ -36,7 +34,6 @@ func (store *SqlStore) CreateNewPost(ctx context.Context, arg CreateNewPostParam
 		arg1 := CreatePostParams{
 			AuthorID:   arg.AuthorID,
 			Title:      arg.Title,
-			Abstract:   arg.Abstract,
 			CoverImage: arg.CoverImage,
 		}
 		post, err := q.CreatePost(ctx, arg1)
@@ -56,7 +53,6 @@ func (store *SqlStore) CreateNewPost(ctx context.Context, arg CreateNewPostParam
 		result.ID = post.ID
 		result.Title = post.Title
 		result.AuthorID = post.AuthorID
-		result.Abstract = post.Abstract
 		result.CoverImage = post.CoverImage
 		result.Content = content.Content
 		result.Status = post.Status

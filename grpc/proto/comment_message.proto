@@ -7,6 +7,25 @@ import "common_message.proto";
 
 option go_package = "github.com/bwen19/blog/grpc/pb";
 
+message Comment {
+    int64 id = 1;
+    UserInfo user = 2;
+    string content = 3;
+    int64 star_count = 4;
+    int64 reply_count = 5;
+    repeated CommentReply replies = 6;
+    google.protobuf.Timestamp create_at = 7;
+}
+
+message CommentReply {
+    int64 id = 1;
+    UserInfo reply_user = 2;
+    UserInfo user = 3;
+    string content = 4;
+    int64 star_count = 5;
+    google.protobuf.Timestamp create_at = 6;
+}
+
 message CreateCommentRequest {
     int64 post_id = 1;
     optional int64 parent_id = 2;

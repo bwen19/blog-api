@@ -41,7 +41,8 @@ func createRandomComment(t *testing.T, postID int64, userIDs []int64) {
 }
 
 func TestComment(t *testing.T) {
-	post := createRandomPost(t)
+	author := createRandomUser(t)
+	post := createRandomPost(t, author)
 	userIDs := []int64{}
 	for i := 0; i < 5; i++ {
 		user := createRandomUser(t)

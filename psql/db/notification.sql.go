@@ -34,6 +34,19 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	return err
 }
 
+const deleteMessages = `-- name: DeleteMessages :execrows
+DELETE FROM notifications
+WHERE id = ANY($1::bigint[]) AND kind = 'admin'
+`
+
+func (q *Queries) DeleteMessages(ctx context.Context, ids []int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteMessages, pq.Array(ids))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteNotifications = `-- name: DeleteNotifications :execrows
 DELETE FROM notifications
 WHERE id = ANY($1::bigint[])
@@ -56,7 +69,9 @@ func (q *Queries) DeleteNotifications(ctx context.Context, arg DeleteNotificatio
 
 const getUnreadCount = `-- name: GetUnreadCount :one
 SELECT count(*) FROM notifications
-WHERE user_id = $1::bigint AND unread = true
+WHERE user_id = $1::bigint
+  AND unread = true
+  AND kind <> 'admin'
 `
 
 func (q *Queries) GetUnreadCount(ctx context.Context, userID int64) (int64, error) {
@@ -76,7 +91,7 @@ Count_CTE AS (
     count(*) filter(WHERE unread = true) unread_count
   FROM Data_CTE
 )
-SELECT dc.id, dc.user_id, dc.kind, dc.title, dc.content, dc.unread, dc.create_at, cc.total, u.username, u.email, u.avatar
+SELECT dc.id, dc.user_id, dc.kind, dc.title, dc.content, dc.unread, dc.create_at, cc.total, cc.unread_count, u.username, u.email, u.avatar
 FROM Data_CTE dc
 CROSS JOIN Count_CTE cc
 JOIN users u ON u.id = dc.user_id
@@ -91,17 +106,18 @@ type ListMessagesParams struct {
 }
 
 type ListMessagesRow struct {
-	ID       int64     `json:"id"`
-	UserID   int64     `json:"user_id"`
-	Kind     string    `json:"kind"`
-	Title    string    `json:"title"`
-	Content  string    `json:"content"`
-	Unread   bool      `json:"unread"`
-	CreateAt time.Time `json:"create_at"`
-	Total    int64     `json:"total"`
-	Username string    `json:"username"`
-	Email    string    `json:"email"`
-	Avatar   string    `json:"avatar"`
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Kind        string    `json:"kind"`
+	Title       string    `json:"title"`
+	Content     string    `json:"content"`
+	Unread      bool      `json:"unread"`
+	CreateAt    time.Time `json:"create_at"`
+	Total       int64     `json:"total"`
+	UnreadCount int64     `json:"unread_count"`
+	Username    string    `json:"username"`
+	Email       string    `json:"email"`
+	Avatar      string    `json:"avatar"`
 }
 
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
@@ -122,6 +138,7 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.Unread,
 			&i.CreateAt,
 			&i.Total,
+			&i.UnreadCount,
 			&i.Username,
 			&i.Email,
 			&i.Avatar,
@@ -143,10 +160,10 @@ const listNotifications = `-- name: ListNotifications :many
 WITH Data_CTE AS (
   SELECT id, kind, title, content, unread, create_at
   FROM notifications
-  WHERE user_id = $3::bigint AND kind = $4::varchar
+  WHERE user_id = $4::bigint AND kind <> 'admin'
 ),
 Count_CTE AS (
-  SELECT count(*) total,
+  SELECT count(*) filter(WHERE kind = $3::varchar) total,
     count(*) filter(WHERE unread = true) unread_count,
     count(*) filter(WHERE unread = true AND kind = 'system') system_count,
     count(*) filter(WHERE unread = true AND kind = 'reply') reply_count
@@ -155,6 +172,7 @@ Count_CTE AS (
 SELECT dc.id, dc.kind, dc.title, dc.content, dc.unread, dc.create_at, cnt.total, cnt.unread_count, cnt.system_count, cnt.reply_count
 FROM Data_CTE dc
 CROSS JOIN Count_CTE cnt
+WHERE kind = $3::varchar
 ORDER BY create_at DESC
 LIMIT $1
 OFFSET $2
@@ -163,8 +181,8 @@ OFFSET $2
 type ListNotificationsParams struct {
 	Limit  int32  `json:"limit"`
 	Offset int32  `json:"offset"`
-	UserID int64  `json:"user_id"`
 	Kind   string `json:"kind"`
+	UserID int64  `json:"user_id"`
 }
 
 type ListNotificationsRow struct {
@@ -184,8 +202,8 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 	rows, err := q.db.QueryContext(ctx, listNotifications,
 		arg.Limit,
 		arg.Offset,
-		arg.UserID,
 		arg.Kind,
+		arg.UserID,
 	)
 	if err != nil {
 		return nil, err

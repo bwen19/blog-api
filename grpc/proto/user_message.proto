@@ -35,7 +35,7 @@ message ListUsersRequest {
     optional string keyword = 5;
 }
 message ListUsersResponse {
-    message UserItem {
+    message User {
         int64 id = 1;
         string username = 2;
         string email = 3;
@@ -46,7 +46,7 @@ message ListUsersResponse {
         google.protobuf.Timestamp create_at = 8;
     }
     int64 total = 1;
-    repeated UserItem users = 2;
+    repeated User users = 2;
 }
 
 message ChangeProfileRequest {

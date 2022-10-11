@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/bwen19/blog/grpc/pb"
 	"github.com/bwen19/blog/psql/db"
@@ -13,15 +14,18 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// CreateTag
+// ========================// CreateTag //======================== //
+
 func (server *Server) CreateTag(ctx context.Context, req *pb.CreateTagRequest) (*pb.CreateTagResponse, error) {
-	name := req.GetName()
-	if err := util.ValidateString(name, 1, 50); err != nil {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
+	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
 	}
 
-	tag, err := server.store.CreateTag(ctx, name)
+	tag, err := server.store.CreateTag(ctx, req.GetName())
 	if err != nil {
 		if pgErr, ok := err.(*pq.Error); ok {
 			switch pgErr.Code.Name() {
@@ -36,31 +40,34 @@ func (server *Server) CreateTag(ctx context.Context, req *pb.CreateTagRequest) (
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// DeleteTags
+// ========================// DeleteTags //======================== //
+
 func (server *Server) DeleteTags(ctx context.Context, req *pb.DeleteTagsRequest) (*emptypb.Empty, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	tagIDs, err := util.ValidateRepeatedIDs(req.GetTagIds())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "tagId: %s", err.Error())
 	}
 
 	nrows, err := server.store.DeleteTags(ctx, tagIDs)
-	if err != nil || int64(len(tagIDs)) != nrows {
+	if err != nil || len(tagIDs) != int(nrows) {
 		return nil, status.Error(codes.Internal, "failed to delete tags")
 	}
-
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// UpdateTag
+// ========================// UpdateTag //======================== //
+
 func (server *Server) UpdateTag(ctx context.Context, req *pb.UpdateTagRequest) (*pb.UpdateTagResponse, error) {
-	if err := util.ValidateID(req.GetTagId()); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "tagId: %s", err.Error())
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
-	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "name: %s", err.Error())
+	if err := validateUpdateTagRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	arg := db.UpdateTagParams{
@@ -83,9 +90,23 @@ func (server *Server) UpdateTag(ctx context.Context, req *pb.UpdateTagRequest) (
 	return rsp, nil
 }
 
-// -------------------------------------------------------------------
-// ListTags
+func validateUpdateTagRequest(req *pb.UpdateTagRequest) error {
+	if err := util.ValidateID(req.GetTagId()); err != nil {
+		return fmt.Errorf("tagId: %s", err.Error())
+	}
+	if err := util.ValidateString(req.GetName(), 1, 50); err != nil {
+		return fmt.Errorf("name: %s", err.Error())
+	}
+	return nil
+}
+
+// ========================// CreateCategory //======================== //
+
 func (server *Server) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*pb.ListTagsResponse, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAdmin); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	options := []string{"name", "postCount", ""}
 	if err := util.ValidatePageOrder(req, options); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -104,13 +125,16 @@ func (server *Server) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*p
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list tags")
 	}
-
 	return convertListTags(tags), nil
 }
 
-// -------------------------------------------------------------------
-// GetTag
+// ========================// CreateCategory //======================== //
+
 func (server *Server) GetTag(ctx context.Context, req *pb.GetTagRequest) (*pb.GetTagResponse, error) {
+	if _, gErr := server.grpcGuard(ctx, roleAuthor); gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := util.ValidateString(req.GetTagName(), 1, 50); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "tagName: %s", err.Error())
 	}

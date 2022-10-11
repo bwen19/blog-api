@@ -28,10 +28,10 @@ WHERE user_id = @user_id::bigint
 WITH Data_CTE AS (
   SELECT id, kind, title, content, unread, create_at
   FROM notifications
-  WHERE user_id = @user_id::bigint AND kind = @kind::varchar
+  WHERE user_id = @user_id::bigint AND kind <> 'admin'
 ),
 Count_CTE AS (
-  SELECT count(*) total,
+  SELECT count(*) filter(WHERE kind = @kind::varchar) total,
     count(*) filter(WHERE unread = true) unread_count,
     count(*) filter(WHERE unread = true AND kind = 'system') system_count,
     count(*) filter(WHERE unread = true AND kind = 'reply') reply_count
@@ -40,6 +40,7 @@ Count_CTE AS (
 SELECT dc.*, cnt.*
 FROM Data_CTE dc
 CROSS JOIN Count_CTE cnt
+WHERE kind = @kind::varchar
 ORDER BY create_at DESC
 LIMIT $1
 OFFSET $2;
@@ -54,10 +55,14 @@ Count_CTE AS (
     count(*) filter(WHERE unread = true) unread_count
   FROM Data_CTE
 )
-SELECT dc.*, cc.total, u.username, u.email, u.avatar
+SELECT dc.*, cc.*, u.username, u.email, u.avatar
 FROM Data_CTE dc
 CROSS JOIN Count_CTE cc
 JOIN users u ON u.id = dc.user_id
 ORDER BY create_at DESC
 LIMIT $1
 OFFSET $2;
+
+-- name: DeleteMessages :execrows
+DELETE FROM notifications
+WHERE id = ANY(@ids::bigint[]) AND kind = 'admin';
