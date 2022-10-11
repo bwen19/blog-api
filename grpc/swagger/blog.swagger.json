@@ -94,6 +94,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -228,6 +229,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -507,6 +509,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -540,6 +543,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -622,6 +626,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -698,6 +703,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -729,6 +735,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -799,6 +806,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -830,6 +838,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -863,6 +872,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -984,6 +994,7 @@
             "in": "body",
             "required": true,
             "schema": {
+              "type": "object",
               "properties": {}
             }
           }
@@ -1001,6 +1012,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1060,6 +1072,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1093,6 +1106,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1126,6 +1140,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1159,6 +1174,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1222,6 +1238,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1493,6 +1510,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1526,6 +1544,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1604,6 +1623,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1799,6 +1819,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1830,6 +1851,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1863,6 +1885,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -1920,6 +1943,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
+              "type": "object",
               "properties": {}
             }
           },
@@ -2093,6 +2117,9 @@
         "id": {
           "type": "string"
         },
+        "user": {
+          "$ref": "#/definitions/pbUserItem"
+        },
         "userAgent": {
           "type": "string"
         },
@@ -2122,53 +2149,6 @@
         "postCount": {
           "type": "string",
           "format": "int64"
-        }
-      }
-    },
-    "ListUsersResponseUserItem": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
-        "username": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "avatar": {
-          "type": "string"
-        },
-        "postCount": {
-          "type": "string",
-          "format": "int64"
-        },
-        "role": {
-          "type": "string"
-        },
-        "deleted": {
-          "type": "boolean"
-        },
-        "createAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "pbAuthorItem": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "int64"
-        },
-        "username": {
-          "type": "string"
-        },
-        "avatar": {
-          "type": "string"
         }
       }
     },
@@ -2508,7 +2488,7 @@
           "type": "string"
         },
         "author": {
-          "$ref": "#/definitions/pbAuthorItem"
+          "$ref": "#/definitions/pbUserItem"
         },
         "coverImage": {
           "type": "string"
@@ -2565,7 +2545,7 @@
           "type": "string"
         },
         "author": {
-          "$ref": "#/definitions/pbAuthorItem"
+          "$ref": "#/definitions/pbUserItem"
         },
         "coverImage": {
           "type": "string"
@@ -2775,7 +2755,7 @@
           "type": "string"
         },
         "author": {
-          "$ref": "#/definitions/pbAuthorItem"
+          "$ref": "#/definitions/pbUserItem"
         },
         "categories": {
           "type": "array",
@@ -2864,8 +2844,40 @@
         "users": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ListUsersResponseUserItem"
+            "$ref": "#/definitions/pbListUsersResponseUser"
           }
+        }
+      }
+    },
+    "pbListUsersResponseUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "postCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "role": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "createAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -3192,6 +3204,21 @@
         },
         "followed": {
           "type": "boolean"
+        }
+      }
+    },
+    "pbUserItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
         }
       }
     },

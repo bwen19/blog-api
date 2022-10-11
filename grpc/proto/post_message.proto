@@ -18,12 +18,6 @@ message Post {
     string status = 8;
 }
 
-message AuthorItem {
-    int64 id = 1;
-    string username = 2;
-    string avatar = 3;
-}
-
 message CreatePostResponse {
     Post post = 1;
 }
@@ -75,7 +69,7 @@ message ListPostsResponse {
     message PostItem {
         int64 id = 1;
         string title = 2;
-        AuthorItem author = 3;
+        UserItem author = 3;
         repeated Category categories = 4;
         repeated Tag tags = 5;
         string status = 6;
@@ -102,7 +96,7 @@ message GetFeaturedPostsResponse {
     message PostItem {
         int64 id = 1;
         string title = 2;
-        AuthorItem author = 3;
+        UserItem author = 3;
         string cover_image = 4;
         int64 view_count = 5;
         int64 star_count = 6;
@@ -127,7 +121,7 @@ message GetPostsResponse {
     message PostItem {
         int64 id = 1;
         string title = 2;
-        AuthorItem author = 3;
+        UserItem author = 3;
         string cover_image = 4;
         repeated Tag tags = 5;
         int64 view_count = 6;

@@ -11,12 +11,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// -------------------------------------------------------------------
-// FollowUser
+// ========================// FollowUser //======================== //
+
 func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest) (*emptypb.Empty, error) {
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
 	}
 
 	userID := req.GetUserId()
@@ -49,20 +49,20 @@ func (server *Server) FollowUser(ctx context.Context, req *pb.FollowUserRequest)
 	return &emptypb.Empty{}, nil
 }
 
-// -------------------------------------------------------------------
-// ListFollows
+// ========================// ListFollows //======================== //
+
 func (server *Server) ListFollows(ctx context.Context, req *pb.ListFollowsRequest) (*pb.ListFollowsResponse, error) {
+	authUser, gErr := server.grpcGuard(ctx, roleUser)
+	if gErr != nil {
+		return nil, gErr.GrpcErr()
+	}
+
 	if err := util.ValidatePage(req); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if err := util.ValidateID(req.GetUserId()); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "userId: %s", err.Error())
-	}
-
-	authUser, ok := ctx.Value(authUserKey{}).(AuthUser)
-	if !ok {
-		return nil, status.Error(codes.Internal, "failed to get auth user")
 	}
 
 	arg := db.ListFollowersParams{

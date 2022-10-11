@@ -20,7 +20,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/rakyll/statik/fs"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -62,11 +61,7 @@ func runDBMigration(migrationURL string, dbSource string) {
 }
 
 func runGrpcServer(config util.Config, server *api.Server) {
-	serverOptions := []grpc.ServerOption{
-		grpc.UnaryInterceptor(server.UnaryInterceptor()),
-		grpc.StreamInterceptor(server.StreamInterceptor()),
-	}
-	grpcServer := grpc.NewServer(serverOptions...)
+	grpcServer := grpc.NewServer()
 
 	pb.RegisterBlogServer(grpcServer, server)
 	reflection.Register(grpcServer)
@@ -97,9 +92,8 @@ func runGatewayServer(config util.Config, server *api.Server) {
 	})
 
 	grpcMux := runtime.NewServeMux(options)
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
-	err := pb.RegisterBlogHandlerFromEndpoint(ctx, grpcMux, config.GRPCServerAddress, opts)
+	err := pb.RegisterBlogHandlerServer(ctx, grpcMux, server)
 	if err != nil {
 		log.Fatal("cannot register handler server:", err)
 	}
@@ -126,8 +120,7 @@ func runGatewayServer(config util.Config, server *api.Server) {
 	}
 
 	log.Printf("start HTTP server at %s", listener.Addr().String())
-	err = http.Serve(listener, mux)
-	if err != nil {
+	if err = http.Serve(listener, mux); err != nil {
 		log.Fatal("cannot start HTTP gateway server:", err)
 	}
 }

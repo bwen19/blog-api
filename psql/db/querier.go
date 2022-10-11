@@ -36,7 +36,7 @@ type Querier interface {
 	DeletePostStar(ctx context.Context, arg DeletePostStarParams) error
 	DeletePostTags(ctx context.Context, arg DeletePostTagsParams) error
 	DeleteSession(ctx context.Context, arg DeleteSessionParams) error
-	DeleteSessions(ctx context.Context, arg DeleteSessionsParams) (int64, error)
+	DeleteSessions(ctx context.Context, ids []uuid.UUID) (int64, error)
 	DeleteTags(ctx context.Context, ids []int64) (int64, error)
 	DeleteUsers(ctx context.Context, ids []int64) (int64, error)
 	GetCategories(ctx context.Context) ([]Category, error)

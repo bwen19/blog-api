@@ -17,6 +17,12 @@ message User {
     string role = 6;
 }
 
+message UserItem {
+    int64 id = 1;
+    string username = 2;
+    string avatar = 3;
+}
+
 message UserInfo {
     int64 id = 1;
     string username = 2;

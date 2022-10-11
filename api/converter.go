@@ -22,9 +22,9 @@ func convertListUsers(users []db.ListUsersRow) *pb.ListUsersResponse {
 		return &pb.ListUsersResponse{}
 	}
 
-	rspUsers := make([]*pb.ListUsersResponse_UserItem, 0, 5)
+	rspUsers := make([]*pb.ListUsersResponse_User, 0, 5)
 	for _, user := range users {
-		pbUser := &pb.ListUsersResponse_UserItem{
+		pbUser := &pb.ListUsersResponse_User{
 			Id:        user.ID,
 			Username:  user.Username,
 			Email:     user.Email,
@@ -269,7 +269,7 @@ func convertListPosts(posts []db.ListPostsRow) *pb.ListPostsResponse {
 
 	rspPosts := []*pb.ListPostsResponse_PostItem{}
 	for _, post := range posts {
-		author := &pb.AuthorItem{
+		author := &pb.UserItem{
 			Id:       post.AuthorID,
 			Username: post.Username,
 			Avatar:   post.Avatar,
@@ -354,7 +354,7 @@ func convertFeaturedPosts(posts []db.GetFeaturedPostsRow) *pb.GetFeaturedPostsRe
 
 	rspPosts := []*pb.GetFeaturedPostsResponse_PostItem{}
 	for _, post := range posts {
-		author := &pb.AuthorItem{
+		author := &pb.UserItem{
 			Id:       post.AuthorID,
 			Username: post.Username,
 			Avatar:   post.Avatar,
@@ -381,7 +381,7 @@ func convertGetPosts(posts []db.GetPostsRow) *pb.GetPostsResponse {
 
 	rspPosts := []*pb.GetPostsResponse_PostItem{}
 	for _, post := range posts {
-		author := &pb.AuthorItem{
+		author := &pb.UserItem{
 			Id:       post.AuthorID,
 			Username: post.Username,
 			Avatar:   post.Avatar,
@@ -460,7 +460,7 @@ func convertReadPost(post db.ReadPostRow) *pb.ReadPostResponse {
 	return &pb.ReadPostResponse{Post: pbPost}
 }
 
-func convertCreateComment(comment db.CreateCommentRow, user db.User) *pb.CreateCommentResponse {
+func convertCreateComment(comment db.CreateCommentRow, user *db.User) *pb.CreateCommentResponse {
 	var replyUser *pb.UserInfo
 	if comment.ReplyUserID.Valid {
 		replyUser = &pb.UserInfo{
